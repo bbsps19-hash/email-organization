@@ -7,6 +7,8 @@ const langButtons = document.querySelectorAll('.lang-btn');
 
 const filterPanel = document.getElementById('filterPanel');
 const resultButton = document.getElementById('resultButton');
+const geminiResponse = document.getElementById('geminiResponse');
+const geminiResponseText = document.getElementById('geminiResponseText');
 const fieldCheckboxes = document.querySelectorAll('.field-checkbox');
 const pagination = document.getElementById('pagination');
 const tabButtons = document.querySelectorAll('.tab-button');
@@ -72,6 +74,8 @@ const translations = {
     geminiError: 'Gemini 서버에 연결할 수 없습니다.',
     geminiSetup: 'Gemini CLI 인증이 필요합니다. 터미널에서 `gemini` 실행 후 인증을 완료하세요.',
     geminiStored: '이전에 실행한 Gemini 결과가 있습니다.',
+    geminiDefaultReply: '요청하신 기준으로 메일을 분류해드리겠습니다.',
+    geminiResponseLabel: 'Gemini 답변',
     fieldSubject: '제목',
     fieldBody: '본문',
     fieldFrom: '발신자',
@@ -121,6 +125,8 @@ const translations = {
     geminiError: 'Could not reach Gemini server.',
     geminiSetup: 'Gemini CLI needs authentication. Run `gemini` in a terminal to finish setup.',
     geminiStored: 'Saved Gemini results are available.',
+    geminiDefaultReply: 'I will classify emails based on your criteria.',
+    geminiResponseLabel: 'Gemini Response',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
     fieldFrom: 'Sender',
@@ -390,6 +396,9 @@ const applyTranslations = () => {
   if (resultButton) {
     resultButton.textContent = t.resultButton;
   }
+  if (geminiResponseText) {
+    geminiResponseText.textContent = t.geminiDefaultReply;
+  }
 
   langButtons.forEach((button) => {
     button.classList.toggle('is-active', button.dataset.lang === state.lang);
@@ -415,6 +424,16 @@ const setGeminiStatus = (message) => {
   status.textContent = message || '';
 };
 
+const setGeminiResponse = (message) => {
+  if (!geminiResponse || !geminiResponseText) return;
+  if (!message) {
+    geminiResponse.hidden = true;
+    return;
+  }
+  geminiResponse.hidden = false;
+  geminiResponseText.textContent = message;
+};
+
 const setGeminiStatusFromStorage = () => {
   const status = document.getElementById('geminiStatus');
   if (!status) return;
@@ -429,6 +448,9 @@ const setGeminiStatusFromStorage = () => {
     const message = t.geminiSuccess(data.matches.length);
     const base = timestamp ? `${message} (${timestamp})` : message;
     status.textContent = `${base} · ${t.geminiStored}`;
+    if (data.reply) {
+      setGeminiResponse(data.reply);
+    }
   } catch (error) {
     // Ignore storage errors.
   }
@@ -464,6 +486,7 @@ const renderFilterPanel = () => {
       });
     }
     setGeminiStatusFromStorage();
+    setGeminiResponse(t.geminiDefaultReply);
   }
 };
 
@@ -513,9 +536,11 @@ const runGeminiClassification = async () => {
     }
     const ids = Array.isArray(data.matches) ? data.matches : [];
     applyGeminiMatches(ids);
+    const reply = data.reply || data.notes || t.geminiDefaultReply;
     const payload = {
       prompt: state.geminiRule || '',
       matches: ids,
+      reply,
       updatedAt: Date.now(),
     };
     try {
@@ -524,6 +549,7 @@ const runGeminiClassification = async () => {
       // Ignore storage errors.
     }
     setGeminiStatus(t.geminiSuccess(ids.length));
+    setGeminiResponse(reply);
     persistSnapshots();
   } catch (error) {
     const message = String(error?.message || '');
@@ -534,6 +560,7 @@ const runGeminiClassification = async () => {
     } else {
       setGeminiStatus(t.geminiError);
     }
+    setGeminiResponse(t.geminiDefaultReply);
   } finally {
     clearTimeout(timeout);
   }
@@ -663,11 +690,22 @@ const renderList = () => {
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'page-tab';
-    toggle.textContent = '더 보기';
+    let expanded = false;
+    const renderToggle = () => {
+      toggle.textContent = state.lang === 'ko'
+        ? (expanded ? '접기' : '더 보기')
+        : (expanded ? 'Show less' : 'Show more');
+    };
+    renderToggle();
     toggle.addEventListener('click', () => {
-      const hidden = fileList.querySelectorAll('li.is-hidden');
-      hidden.forEach((item) => item.classList.remove('is-hidden'));
-      toggle.remove();
+      expanded = !expanded;
+      const items = fileList.querySelectorAll('li');
+      items.forEach((item, idx) => {
+        if (idx >= 5) {
+          item.classList.toggle('is-hidden', !expanded);
+        }
+      });
+      renderToggle();
     });
     fileList.appendChild(toggle);
   }
