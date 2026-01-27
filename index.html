@@ -9,34 +9,137 @@
 <body>
   <main class="page">
     <header class="hero">
-      <p class="eyebrow">Email Toolkit</p>
-      <h1>이메일 정리기</h1>
-      <p class="subtitle">.eml 파일을 드래그하거나 선택해 정리 준비를 시작하세요.</p>
+      <div class="hero-top">
+        <p class="eyebrow">Email Toolkit</p>
+        <div class="lang-toggle" role="group" aria-label="Language toggle">
+          <button type="button" class="lang-btn is-active" data-lang="ko">KO</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+        </div>
+      </div>
+      <h1 data-i18n="title">이메일 정리기</h1>
+      <p class="subtitle" data-i18n="subtitle">.eml 파일을 드래그하거나 선택해 정리 준비를 시작하세요.</p>
     </header>
 
     <section class="upload-card" aria-labelledby="upload-title">
       <div class="upload-head">
-        <h2 id="upload-title">.eml 가져오기</h2>
-        <p>메시지 원본(.eml)만 업로드됩니다. 최대 10개까지 선택 가능.</p>
+        <h2 id="upload-title" data-i18n="uploadTitle">.eml 가져오기</h2>
+        <p data-i18n="uploadHint">메시지 원본(.eml)만 업로드됩니다. 최대 10개까지 선택 가능.</p>
       </div>
 
-      <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label=".eml 파일을 여기로 드롭하세요">
+      <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label=".eml 파일을 여기로 드롭하세요" data-i18n-aria="dropAria">
         <div class="drop-icon" aria-hidden="true">⤓</div>
         <div>
-          <p class="drop-title">파일을 드래그해서 놓기</p>
-          <p class="drop-sub">또는 아래 버튼으로 선택</p>
+          <p class="drop-title" data-i18n="dropTitle">파일을 드래그해서 놓기</p>
+          <p class="drop-sub" data-i18n="dropSub">또는 아래 버튼으로 선택</p>
         </div>
       </div>
 
       <div class="file-actions">
-        <label class="file-button" for="emlInput">.eml 파일 선택</label>
+        <label class="file-button" for="emlInput" data-i18n="selectButton">.eml 파일 선택</label>
         <input id="emlInput" type="file" accept=".eml,message/rfc822" multiple hidden />
-        <p class="hint">지원 형식: .eml</p>
+        <p class="hint" data-i18n="supported">지원 형식: .eml</p>
       </div>
 
+      <p class="warning" id="warning" role="alert" hidden></p>
+
       <div class="file-list" aria-live="polite" aria-atomic="true">
-        <p class="file-empty">아직 선택된 파일이 없습니다.</p>
+        <p class="file-empty" data-i18n="empty">아직 선택된 파일이 없습니다.</p>
         <ul id="fileList" hidden></ul>
+      </div>
+    </section>
+
+    <section class="filter-card" aria-labelledby="filter-title">
+      <div class="filter-head">
+        <h2 id="filter-title" data-i18n="filterTitle">필터 & 분류 규칙</h2>
+        <p data-i18n="filterHint">분류 기준을 수정하고, 조건에 맞는 메일만 확인하세요.</p>
+      </div>
+      <div class="filter-controls">
+        <label class="filter-label" for="categoryFilter" data-i18n="filterCategory">카테고리</label>
+        <select id="categoryFilter">
+          <option value="all" data-i18n="filterAll">전체</option>
+          <option value="work" data-i18n="categoryWork">업무</option>
+          <option value="finance" data-i18n="categoryFinance">결제/영수증</option>
+          <option value="marketing" data-i18n="categoryMarketing">프로모션</option>
+          <option value="security" data-i18n="categorySecurity">보안/계정</option>
+          <option value="personal" data-i18n="categoryPersonal">개인</option>
+        </select>
+
+        <label class="filter-label" for="searchInput" data-i18n="filterSearch">검색</label>
+        <input id="searchInput" type="text" placeholder="제목, 본문, 발신자, 첨부파일명" data-i18n-placeholder="filterPlaceholder" />
+
+        <div class="filter-fields" role="group" aria-label="Filter fields">
+          <label><input type="checkbox" class="field-checkbox" value="subject" checked /> <span data-i18n="fieldSubject">제목</span></label>
+          <label><input type="checkbox" class="field-checkbox" value="body" checked /> <span data-i18n="fieldBody">본문</span></label>
+          <label><input type="checkbox" class="field-checkbox" value="from" checked /> <span data-i18n="fieldFrom">발신자</span></label>
+          <label><input type="checkbox" class="field-checkbox" value="attachments" checked /> <span data-i18n="fieldAttachments">첨부파일명</span></label>
+        </div>
+      </div>
+
+      <div class="rule-editor">
+        <h3 data-i18n="ruleTitle">키워드 규칙</h3>
+        <p class="rule-hint" data-i18n="ruleHint">쉼표로 키워드를 구분하세요. 수정하면 자동 분류가 갱신됩니다.</p>
+        <div class="rule-grid">
+          <label class="rule-item">
+            <span data-i18n="categoryWork">업무</span>
+            <input type="text" data-rule="work" />
+          </label>
+          <label class="rule-item">
+            <span data-i18n="categoryFinance">결제/영수증</span>
+            <input type="text" data-rule="finance" />
+          </label>
+          <label class="rule-item">
+            <span data-i18n="categoryMarketing">프로모션</span>
+            <input type="text" data-rule="marketing" />
+          </label>
+          <label class="rule-item">
+            <span data-i18n="categorySecurity">보안/계정</span>
+            <input type="text" data-rule="security" />
+          </label>
+          <label class="rule-item">
+            <span data-i18n="categoryPersonal">개인</span>
+            <input type="text" data-rule="personal" />
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary-card" aria-live="polite" aria-atomic="true">
+      <div class="summary-head">
+        <h2 data-i18n="summaryTitle">요약 & 분류</h2>
+        <p data-i18n="summaryHint">가장 최근에 선택한 .eml 파일의 메타데이터를 표시합니다.</p>
+      </div>
+      <div class="summary-grid">
+        <div>
+          <h3 data-i18n="summaryMeta">메타데이터</h3>
+          <dl class="meta-list">
+            <div>
+              <dt data-i18n="metaSubject">제목</dt>
+              <dd id="metaSubject">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="metaFrom">보낸 사람</dt>
+              <dd id="metaFrom">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="metaTo">받는 사람</dt>
+              <dd id="metaTo">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="metaDate">날짜</dt>
+              <dd id="metaDate">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="metaAttachments">첨부파일</dt>
+              <dd id="metaAttachments">-</dd>
+            </div>
+          </dl>
+        </div>
+        <div>
+          <h3 data-i18n="summaryCategory">자동 분류</h3>
+          <div class="badge" id="metaCategory">-</div>
+          <h3 data-i18n="summarySnippet">본문 미리보기</h3>
+          <p class="snippet" id="metaSnippet">-</p>
+        </div>
       </div>
     </section>
   </main>
