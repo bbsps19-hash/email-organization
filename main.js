@@ -7,9 +7,13 @@ const langButtons = document.querySelectorAll('.lang-btn');
 
 const categoryFilter = document.getElementById('categoryFilter');
 const searchInput = document.getElementById('searchInput');
+const searchInputRules = document.getElementById('searchInputRules');
+const keywordInput = document.getElementById('keywordInput');
 const fieldCheckboxes = document.querySelectorAll('.field-checkbox');
 const ruleInputs = document.querySelectorAll('[data-rule]');
 const pagination = document.getElementById('pagination');
+const tabButtons = document.querySelectorAll('.tab-button');
+const tabPanels = document.querySelectorAll('[data-panel]');
 
 const metaSubject = document.getElementById('metaSubject');
 const metaFrom = document.getElementById('metaFrom');
@@ -27,6 +31,7 @@ const state = {
   warning: null,
   emails: [],
   page: 1,
+  mode: 'search',
   rules: {
     work: ['meeting', 'project', 'deadline', 'report', 'proposal', 'client', '회의', '프로젝트', '마감', '보고', '업무'],
     finance: ['invoice', 'receipt', 'payment', 'order', 'refund', 'billing', '결제', '영수증', '청구', '주문', '환불'],
@@ -60,11 +65,15 @@ const translations = {
     summarySnippet: '본문 미리보기',
     summaryAttachments: '첨부파일 다운로드',
     filterTitle: '필터 & 분류 규칙',
-    filterHint: '분류 기준을 수정하고, 조건에 맞는 메일만 확인하세요.',
+    filterHint: '필터 탭을 선택해 메일을 빠르게 찾거나 자동 분류를 설정하세요.',
     filterCategory: '카테고리',
     filterAll: '전체',
     filterSearch: '검색',
     filterPlaceholder: '제목, 본문, 발신자, 첨부파일명',
+    tabSearch: '검색 엔진',
+    tabRules: '분류 규칙',
+    keywordLabel: '키워드',
+    keywordPlaceholder: '키워드 여러 개는 쉼표로 구분',
     fieldSubject: '제목',
     fieldBody: '본문',
     fieldFrom: '발신자',
@@ -107,11 +116,15 @@ const translations = {
     summarySnippet: 'Body Preview',
     summaryAttachments: 'Attachments',
     filterTitle: 'Filters & Rules',
-    filterHint: 'Edit classification rules and show only matching emails.',
+    filterHint: 'Pick a tab to search quickly or apply rule-based classification.',
     filterCategory: 'Category',
     filterAll: 'All',
     filterSearch: 'Search',
     filterPlaceholder: 'Subject, body, sender, attachment name',
+    tabSearch: 'Search',
+    tabRules: 'Rules',
+    keywordLabel: 'Keywords',
+    keywordPlaceholder: 'Separate keywords with commas',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
     fieldFrom: 'Sender',
@@ -401,6 +414,20 @@ const applyTranslations = () => {
   renderSummary(state.summaryId);
 };
 
+const setMode = (mode) => {
+  state.mode = mode;
+  tabButtons.forEach((button) => {
+    const isActive = button.dataset.tab === mode;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+  tabPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.panel !== mode;
+  });
+  state.page = 1;
+  renderList();
+};
+
 const persistSnapshots = () => {
   try {
     const serialize = (email) => ({
@@ -426,8 +453,10 @@ const persistSnapshots = () => {
         updatedAt: Date.now(),
         emails: filtered.map(serialize),
         filters: {
+          mode: state.mode,
           category: categoryFilter.value,
-          query: searchInput.value,
+          query: state.mode === 'rules' ? searchInputRules.value : searchInput.value,
+          keywords: keywordInput.value,
           fields: getActiveFields(),
         },
       })
@@ -763,21 +792,28 @@ const parseEml = (buffer) => {
   return { subject, from, to, date, body, snippet, attachments, attachmentsData, category };
 };
 
-const getActiveFields = () =>
-  Array.from(fieldCheckboxes)
+const getActiveFields = () => {
+  const activePanel = document.querySelector('[data-panel]:not([hidden])');
+  const scope = activePanel ? activePanel.querySelectorAll('.field-checkbox') : fieldCheckboxes;
+  return Array.from(scope)
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
+};
 
 const getFilteredEmails = () => {
   const category = categoryFilter.value;
-  const query = searchInput.value.trim().toLowerCase();
+  const query = (state.mode === 'rules' ? searchInputRules.value : searchInput.value).trim().toLowerCase();
+  const keywords = keywordInput.value
+    .split(',')
+    .map((term) => term.trim().toLowerCase())
+    .filter(Boolean);
   const fields = getActiveFields();
 
   return state.emails.filter((email) => {
-    if (category !== 'all' && email.category !== category) {
+    if (state.mode === 'rules' && category !== 'all' && email.category !== category) {
       return false;
     }
-    if (!query) return true;
+    if (!query && !keywords.length) return true;
     if (!fields.length) return false;
 
     const haystacks = [];
@@ -786,7 +822,13 @@ const getFilteredEmails = () => {
     if (fields.includes('from')) haystacks.push(email.from);
     if (fields.includes('attachments')) haystacks.push(email.attachments.join(' '));
 
-    return haystacks.some((text) => (text || '').toLowerCase().includes(query));
+    const combined = haystacks.join(' ').toLowerCase();
+    const queryOk = query ? combined.includes(query) : true;
+    const keywordsOk = keywords.length
+      ? keywords.every((term) => combined.includes(term))
+      : true;
+
+    return queryOk && keywordsOk;
   });
 };
 
@@ -893,6 +935,15 @@ dropZone.addEventListener('drop', (event) => {
   }
 });
 
+tabButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const next = button.dataset.tab;
+    if (next && next !== state.mode) {
+      setMode(next);
+    }
+  });
+});
+
 langButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const nextLang = button.dataset.lang;
@@ -908,6 +959,14 @@ categoryFilter.addEventListener('change', () => {
   renderList();
 });
 searchInput.addEventListener('input', () => {
+  state.page = 1;
+  renderList();
+});
+searchInputRules.addEventListener('input', () => {
+  state.page = 1;
+  renderList();
+});
+keywordInput.addEventListener('input', () => {
   state.page = 1;
   renderList();
 });
@@ -929,4 +988,5 @@ ruleInputs.forEach((input) => {
 });
 
 setupRuleInputs();
+setMode(state.mode);
 applyTranslations();
