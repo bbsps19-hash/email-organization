@@ -100,9 +100,17 @@ const renderPagination = (totalPages, emails) => {
 
 const loadGeminiData = () => {
   try {
-    const raw = localStorage.getItem('emailOrganizerGeminiPayload') || sessionStorage.getItem('emailOrganizerGeminiPayload');
+    const raw =
+      localStorage.getItem('emailOrganizerGeminiPayload') ||
+      sessionStorage.getItem('emailOrganizerGeminiPayload') ||
+      localStorage.getItem('emailOrganizerGemini') ||
+      sessionStorage.getItem('emailOrganizerGemini');
     const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
-    if (!raw) return { matches: [], prompt: '', reply: '', emails: [] };
+    const params = new URLSearchParams(window.location.search);
+    const paramRule = params.get('rule') || '';
+    if (!raw) {
+      return { matches: [], prompt: paramRule, reply: '', keywords: [], emails: [] };
+    }
     const gemini = JSON.parse(raw);
     const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : { emails: [] };
     const matches = Array.isArray(gemini.matches) ? gemini.matches : [];
@@ -112,7 +120,7 @@ const loadGeminiData = () => {
       : emails.filter((email) => matches.includes(email.id));
     return {
       matches,
-      prompt: gemini.prompt || '',
+      prompt: gemini.prompt || paramRule || '',
       reply: gemini.reply || '',
       keywords: Array.isArray(gemini.keywords) ? gemini.keywords : [],
       emails: selected,
@@ -123,6 +131,7 @@ const loadGeminiData = () => {
 };
 
 const data = loadGeminiData();
+console.log('[gemini] loaded', data);
 summary.textContent = t[lang].summary;
 userBubble.textContent = data.prompt || t[lang].fallbackUser;
 assistantBubble.textContent = data.reply || t[lang].fallbackAssistant;

@@ -1173,12 +1173,13 @@ langButtons.forEach((button) => {
   });
 });
 
-  if (resultButton) {
-    resultButton.addEventListener('click', () => {
-      if (state.mode === 'gemini') {
+if (resultButton) {
+  resultButton.addEventListener('click', () => {
+    if (state.mode === 'gemini') {
       runGeminiClassification().then(() => {
         persistSnapshots();
-        window.location.href = '/gemini.html';
+        const ruleParam = encodeURIComponent(state.geminiRule.trim());
+        window.location.href = `/gemini.html?rule=${ruleParam}`;
       });
       return;
     }
