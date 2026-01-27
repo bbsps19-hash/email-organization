@@ -520,6 +520,10 @@ const setMode = (mode) => {
     panel.hidden = panel.dataset.panel !== mode;
   });
   state.page = 1;
+  if (mode !== 'gemini') {
+    state.geminiMatches = null;
+    setGeminiStatus('');
+  }
   refreshCategories();
 };
 
@@ -877,6 +881,9 @@ const parseEml = (buffer) => {
 };
 
 const getActiveFields = () => {
+  if (!fieldCheckboxes.length) {
+    return ['subject', 'body', 'from', 'attachments'];
+  }
   const activePanel = document.querySelector('[data-panel]:not([hidden])');
   const scope = activePanel ? activePanel.querySelectorAll('.field-checkbox') : fieldCheckboxes;
   return Array.from(scope)
@@ -894,7 +901,9 @@ const getFilteredEmails = () => {
 
   return state.emails.filter((email) => {
     if (state.mode === 'gemini') {
-      if (!state.geminiMatches) return false;
+      if (!state.geminiMatches || state.geminiMatches.size === 0) {
+        return true;
+      }
       return state.geminiMatches.has(email.id);
     }
     if (!query && !keywords.length) return true;
