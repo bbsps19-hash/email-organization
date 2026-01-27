@@ -1190,6 +1190,16 @@ langButtons.forEach((button) => {
 if (resultButton) {
   resultButton.addEventListener('click', () => {
     if (state.mode === 'gemini') {
+      const textarea = document.getElementById('geminiPrompt');
+      if (textarea) {
+        state.geminiRule = textarea.value;
+      }
+      if (!state.geminiRule.trim()) {
+        const t = translations[state.lang];
+        setGeminiStatus(t.geminiRuleRequired);
+        resultButton.disabled = true;
+        return;
+      }
       runGeminiClassification().then(() => {
         persistSnapshots();
         const ruleParam = encodeURIComponent(state.geminiRule.trim());
