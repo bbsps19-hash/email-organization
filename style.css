@@ -476,6 +476,29 @@ body {
   padding: 0;
 }
 
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-tab {
+  border: none;
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--accent-strong);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+
+.page-tab.is-active {
+  background: var(--accent);
+  color: white;
+}
+
 @keyframes rise {
   from {
     opacity: 0;

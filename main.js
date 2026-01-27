@@ -9,6 +9,7 @@ const categoryFilter = document.getElementById('categoryFilter');
 const searchInput = document.getElementById('searchInput');
 const fieldCheckboxes = document.querySelectorAll('.field-checkbox');
 const ruleInputs = document.querySelectorAll('[data-rule]');
+const pagination = document.getElementById('pagination');
 
 const metaSubject = document.getElementById('metaSubject');
 const metaFrom = document.getElementById('metaFrom');
@@ -25,6 +26,7 @@ const state = {
   summaryId: null,
   warning: null,
   emails: [],
+  page: 1,
   rules: {
     work: ['meeting', 'project', 'deadline', 'report', 'proposal', 'client', '회의', '프로젝트', '마감', '보고', '업무'],
     finance: ['invoice', 'receipt', 'payment', 'order', 'refund', 'billing', '결제', '영수증', '청구', '주문', '환불'],
@@ -438,11 +440,18 @@ const persistSnapshots = () => {
 const renderList = () => {
   const filtered = getFilteredEmails();
   fileList.innerHTML = '';
+  const pageSize = 100;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (state.page > totalPages) state.page = totalPages;
+  const start = (state.page - 1) * pageSize;
+  const paged = filtered.slice(start, start + pageSize);
 
   if (!filtered.length) {
     emptyState.textContent = state.emails.length ? translations[state.lang].emptyFiltered : translations[state.lang].empty;
     emptyState.hidden = false;
     fileList.hidden = true;
+    pagination.hidden = true;
+    pagination.innerHTML = '';
     persistSnapshots();
     return;
   }
@@ -450,7 +459,7 @@ const renderList = () => {
   emptyState.hidden = true;
   fileList.hidden = false;
 
-  filtered.forEach((email) => {
+  paged.forEach((email) => {
     const li = document.createElement('li');
     li.dataset.id = email.id;
     if (email.id === state.summaryId) {
@@ -480,7 +489,30 @@ const renderList = () => {
     });
     fileList.appendChild(li);
   });
+  renderPagination(totalPages);
   persistSnapshots();
+};
+
+const renderPagination = (totalPages) => {
+  if (totalPages <= 1) {
+    pagination.hidden = true;
+    pagination.innerHTML = '';
+    return;
+  }
+  pagination.hidden = false;
+  pagination.innerHTML = '';
+  for (let i = 1; i <= totalPages; i += 1) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'page-tab';
+    button.textContent = i;
+    if (i === state.page) button.classList.add('is-active');
+    button.addEventListener('click', () => {
+      state.page = i;
+      renderList();
+    });
+    pagination.appendChild(button);
+  }
 };
 
 const parseHeaders = (rawHeaders) => {
@@ -810,6 +842,7 @@ const handleFiles = async (fileListInput) => {
   if (!parsed.length) {
     state.emails = [];
     state.summaryId = null;
+    state.page = 1;
     renderList();
     renderSummary(null);
     return;
@@ -817,6 +850,7 @@ const handleFiles = async (fileListInput) => {
 
   state.emails = parsed;
   state.summaryId = parsed[parsed.length - 1]?.id ?? null;
+  state.page = 1;
   renderList();
   renderSummary(state.summaryId);
 };
@@ -869,16 +903,28 @@ langButtons.forEach((button) => {
   });
 });
 
-categoryFilter.addEventListener('change', renderList);
-searchInput.addEventListener('input', renderList);
+categoryFilter.addEventListener('change', () => {
+  state.page = 1;
+  renderList();
+});
+searchInput.addEventListener('input', () => {
+  state.page = 1;
+  renderList();
+});
 fieldCheckboxes.forEach((checkbox) => {
-  checkbox.addEventListener('change', renderList);
+  checkbox.addEventListener('change', () => {
+    state.page = 1;
+    renderList();
+  });
 });
 
 ruleInputs.forEach((input) => {
   input.addEventListener('input', () => {
     updateRulesFromInputs();
     refreshClassifications();
+    state.page = 1;
+    renderList();
+    persistSnapshots();
   });
 });
 
