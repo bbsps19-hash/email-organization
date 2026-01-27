@@ -39,7 +39,7 @@ const translations = {
     title: '이메일 정리기',
     subtitle: '.eml 파일을 드래그하거나 선택해 정리 준비를 시작하세요.',
     uploadTitle: '.eml 가져오기',
-    uploadHint: '메시지 원본(.eml)만 업로드됩니다. 최대 10개까지 선택 가능.',
+    uploadHint: '메시지 원본(.eml)만 업로드됩니다. 다중 선택 가능.',
     dropTitle: '파일을 드래그해서 놓기',
     dropSub: '또는 아래 버튼으로 선택',
     selectButton: '.eml 파일 선택',
@@ -86,7 +86,7 @@ const translations = {
     title: 'Email Organizer',
     subtitle: 'Drag and drop .eml files or select them to start organizing.',
     uploadTitle: 'Import .eml',
-    uploadHint: 'Only raw .eml messages are accepted. Up to 10 files.',
+    uploadHint: 'Only raw .eml messages are accepted. Multiple selection allowed.',
     dropTitle: 'Drop files here',
     dropSub: 'Or select using the button',
     selectButton: 'Choose .eml files',
@@ -766,7 +766,7 @@ const refreshClassifications = () => {
 
 const handleFiles = async (fileListInput) => {
   const allFiles = Array.from(fileListInput);
-  const limitedFiles = allFiles.slice(0, 10);
+  const limitedFiles = allFiles;
   const parsed = [];
   let invalidCount = 0;
 
