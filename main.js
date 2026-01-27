@@ -528,16 +528,15 @@ const runGeminiClassification = async () => {
   setGeminiStatus(t.geminiRunning);
   setGeminiResponse(t.geminiDefaultReply);
   try {
-    localStorage.setItem(
-      'emailOrganizerGemini',
-      JSON.stringify({
-        prompt: state.geminiRule.trim(),
-        matches: [],
-        keywords: [],
-        reply: t.geminiDefaultReply,
-        updatedAt: Date.now(),
-      })
-    );
+    const seed = JSON.stringify({
+      prompt: state.geminiRule.trim(),
+      matches: [],
+      keywords: [],
+      reply: t.geminiDefaultReply,
+      updatedAt: Date.now(),
+    });
+    localStorage.setItem('emailOrganizerGemini', seed);
+    sessionStorage.setItem('emailOrganizerGemini', seed);
   } catch (error) {
     // Ignore storage errors.
   }
@@ -579,7 +578,9 @@ const runGeminiClassification = async () => {
       updatedAt: Date.now(),
     };
     try {
-      localStorage.setItem('emailOrganizerGemini', JSON.stringify(payload));
+      const packed = JSON.stringify(payload);
+      localStorage.setItem('emailOrganizerGemini', packed);
+      sessionStorage.setItem('emailOrganizerGemini', packed);
     } catch (error) {
       // Ignore storage errors.
     }

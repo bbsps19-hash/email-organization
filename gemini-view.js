@@ -100,11 +100,11 @@ const renderPagination = (totalPages, emails) => {
 
 const loadGeminiData = () => {
   try {
-    const raw = localStorage.getItem('emailOrganizerGemini');
+    const raw = localStorage.getItem('emailOrganizerGemini') || sessionStorage.getItem('emailOrganizerGemini');
     const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
-    if (!raw || !snapshotRaw) return { matches: [], prompt: '', reply: '', emails: [] };
+    if (!raw) return { matches: [], prompt: '', reply: '', emails: [] };
     const gemini = JSON.parse(raw);
-    const snapshot = JSON.parse(snapshotRaw);
+    const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : { emails: [] };
     const matches = Array.isArray(gemini.matches) ? gemini.matches : [];
     const emails = Array.isArray(snapshot.emails) ? snapshot.emails : [];
     const selected = emails.filter((email) => matches.includes(email.id));
