@@ -180,6 +180,32 @@ body {
   line-height: 1.5;
 }
 
+.gemini-chat {
+  display: grid;
+  gap: 12px;
+}
+
+.chat-bubble {
+  padding: 12px 14px;
+  border-radius: 14px;
+  max-width: 85%;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.chat-bubble.user {
+  justify-self: end;
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--accent-strong);
+}
+
+.chat-bubble.assistant {
+  justify-self: start;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 .filter-label {
   font-size: 0.85rem;
   text-transform: uppercase;

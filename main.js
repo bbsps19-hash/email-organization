@@ -1113,7 +1113,7 @@ if (resultButton) {
     if (state.mode === 'gemini') {
       runGeminiClassification().then(() => {
         persistSnapshots();
-        window.location.href = '/eml.html';
+        window.location.href = '/gemini.html';
       });
       return;
     }
