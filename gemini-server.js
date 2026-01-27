@@ -16,13 +16,23 @@ const jsonResponse = (res, status, payload) => {
 
 const parseJsonFromText = (text) => {
   try {
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed.response === 'string') {
+      const nested = parseJsonFromText(parsed.response);
+      return nested || parsed;
+    }
+    return parsed;
   } catch (error) {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
     if (start >= 0 && end > start) {
       try {
-        return JSON.parse(text.slice(start, end + 1));
+        const parsed = JSON.parse(text.slice(start, end + 1));
+        if (parsed && typeof parsed.response === 'string') {
+          const nested = parseJsonFromText(parsed.response);
+          return nested || parsed;
+        }
+        return parsed;
       } catch (innerError) {
         return null;
       }
@@ -65,7 +75,7 @@ const runGemini = (prompt, emails) =>
     const killTimer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error('GEMINI_TIMEOUT'));
-    }, 15000);
+    }, 25000);
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString('utf-8');
