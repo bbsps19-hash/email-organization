@@ -173,7 +173,8 @@ const baseData = loadGeminiData();
 console.log('[gemini] loaded', baseData);
 renderAll(baseData);
 
-if (baseData.status === 'pending' && baseData.prompt) {
+const shouldRunGemini = baseData.prompt && (baseData.status === 'pending' || (baseData.matches || []).length === 0);
+if (shouldRunGemini) {
   assistantBubble.textContent = t[lang].running;
   callGemini(baseData.prompt, snapshot.emails || [])
     .then((data) => {
