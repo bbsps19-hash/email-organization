@@ -1,14 +1,46 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
-  <link href='/style.css' rel='stylesheet'>
+  <title>이메일 정리기</title>
+  <link href="/style.css" rel="stylesheet" />
 </head>
 <body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
-  <script defer type="text/javascript" src="/main.js"></script>
+  <main class="page">
+    <header class="hero">
+      <p class="eyebrow">Email Toolkit</p>
+      <h1>이메일 정리기</h1>
+      <p class="subtitle">.eml 파일을 드래그하거나 선택해 정리 준비를 시작하세요.</p>
+    </header>
+
+    <section class="upload-card" aria-labelledby="upload-title">
+      <div class="upload-head">
+        <h2 id="upload-title">.eml 가져오기</h2>
+        <p>메시지 원본(.eml)만 업로드됩니다. 최대 10개까지 선택 가능.</p>
+      </div>
+
+      <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label=".eml 파일을 여기로 드롭하세요">
+        <div class="drop-icon" aria-hidden="true">⤓</div>
+        <div>
+          <p class="drop-title">파일을 드래그해서 놓기</p>
+          <p class="drop-sub">또는 아래 버튼으로 선택</p>
+        </div>
+      </div>
+
+      <div class="file-actions">
+        <label class="file-button" for="emlInput">.eml 파일 선택</label>
+        <input id="emlInput" type="file" accept=".eml,message/rfc822" multiple hidden />
+        <p class="hint">지원 형식: .eml</p>
+      </div>
+
+      <div class="file-list" aria-live="polite" aria-atomic="true">
+        <p class="file-empty">아직 선택된 파일이 없습니다.</p>
+        <ul id="fileList" hidden></ul>
+      </div>
+    </section>
+  </main>
+
+  <script defer src="/main.js"></script>
 </body>
 </html>

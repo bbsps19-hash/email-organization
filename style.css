@@ -1,1 +1,241 @@
-/* Add styles here */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Space+Grotesk:wght@400;500;600&display=swap');
+
+:root {
+  color-scheme: light;
+  --ink: #111827;
+  --muted: #4b5563;
+  --accent: #0f766e;
+  --accent-strong: #0b4f4a;
+  --card: #fef7ee;
+  --card-shadow: rgba(15, 23, 42, 0.15);
+  --border: rgba(15, 23, 42, 0.15);
+  --surface: rgba(255, 255, 255, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top, rgba(15, 118, 110, 0.2), transparent 55%),
+    radial-gradient(circle at 80% 20%, rgba(234, 179, 8, 0.2), transparent 60%),
+    linear-gradient(180deg, #f8fafc 0%, #fef3c7 100%);
+  display: flex;
+  justify-content: center;
+  padding: 72px 20px 120px;
+}
+
+.page {
+  width: min(960px, 100%);
+  display: grid;
+  gap: 32px;
+}
+
+.hero {
+  background: var(--surface);
+  border-radius: 28px;
+  padding: 36px 40px;
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 48px -36px var(--card-shadow);
+  animation: rise 0.7s ease-out both;
+}
+
+.eyebrow {
+  font-size: 0.85rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+  margin: 0 0 12px;
+}
+
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.4rem, 3vw + 1.2rem, 3.6rem);
+  margin: 0 0 8px;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.upload-card {
+  background: var(--card);
+  border-radius: 30px;
+  padding: 32px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 18px 45px -34px var(--card-shadow);
+  animation: fade-in 0.8s ease-out 0.15s both;
+  display: grid;
+  gap: 24px;
+}
+
+.upload-head h2 {
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+}
+
+.upload-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.drop-zone {
+  border: 2px dashed rgba(15, 118, 110, 0.35);
+  border-radius: 20px;
+  padding: 28px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.7);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.drop-zone:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.5);
+  outline-offset: 4px;
+}
+
+.drop-zone.is-dragover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px -18px var(--card-shadow);
+}
+
+.drop-icon {
+  font-size: 2rem;
+  background: rgba(15, 118, 110, 0.12);
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: var(--accent-strong);
+}
+
+.drop-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.drop-sub {
+  margin: 0;
+  color: var(--muted);
+}
+
+.file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.file-button {
+  background: var(--accent);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 14px 28px -18px rgba(15, 118, 110, 0.7);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.file-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px -20px rgba(15, 118, 110, 0.7);
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.file-list {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.65);
+  padding: 16px 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.file-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+#fileList {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+#fileList li {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 0.95rem;
+}
+
+#fileList span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 700px) {
+  body {
+    padding: 48px 16px 80px;
+  }
+
+  .hero {
+    padding: 28px 24px;
+  }
+
+  .upload-card {
+    padding: 24px;
+  }
+
+  .drop-zone {
+    grid-template-columns: 1fr;
+  }
+}
