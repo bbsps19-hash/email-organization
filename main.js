@@ -673,9 +673,6 @@ const setMode = (mode) => {
     button.classList.toggle('is-active', isActive);
     button.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
-  tabPanels.forEach((panel) => {
-    panel.hidden = panel.dataset.panel !== mode;
-  });
   state.page = 1;
   if (mode !== 'gemini') {
     state.geminiMatches = null;
@@ -690,6 +687,7 @@ const setMode = (mode) => {
     // Ignore storage errors.
   }
   refreshCategories();
+  renderFilterPanel();
 };
 
 const persistSnapshots = () => {
