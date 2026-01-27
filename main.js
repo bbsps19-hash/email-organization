@@ -16,6 +16,7 @@ const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('[data-panel]');
 
 const GEMINI_STORAGE_KEY = 'emailOrganizerGeminiPayload';
+const TAB_STORAGE_KEY = 'email_toolkit_tab';
 
 const metaSubject = document.getElementById('metaSubject');
 const metaFrom = document.getElementById('metaFrom');
@@ -38,6 +39,15 @@ const state = {
   geminiRule: '',
   geminiMatches: null,
 };
+
+try {
+  const savedTab = localStorage.getItem(TAB_STORAGE_KEY);
+  if (savedTab === 'search' || savedTab === 'gemini') {
+    state.mode = savedTab;
+  }
+} catch (error) {
+  // Ignore storage errors.
+}
 
 const translations = {
   ko: {
@@ -655,6 +665,7 @@ const refreshCategories = () => {
 };
 
 const setMode = (mode) => {
+  if (mode !== 'search' && mode !== 'gemini') return;
   state.mode = mode;
   tabButtons.forEach((button) => {
     const isActive = button.dataset.tab === mode;
@@ -668,6 +679,11 @@ const setMode = (mode) => {
   if (mode !== 'gemini') {
     state.geminiMatches = null;
     setGeminiStatus('');
+  }
+  try {
+    localStorage.setItem(TAB_STORAGE_KEY, mode);
+  } catch (error) {
+    // Ignore storage errors.
   }
   refreshCategories();
 };
