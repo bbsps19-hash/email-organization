@@ -12,6 +12,7 @@ const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('[data-panel]');
 const geminiPrompt = document.getElementById('geminiPrompt');
 const geminiRun = document.getElementById('geminiRun');
+const geminiStatus = document.getElementById('geminiStatus');
 
 const metaSubject = document.getElementById('metaSubject');
 const metaFrom = document.getElementById('metaFrom');
@@ -30,6 +31,7 @@ const state = {
   emails: [],
   page: 1,
   mode: 'search',
+  geminiMatches: null,
 };
 
 const translations = {
@@ -65,6 +67,9 @@ const translations = {
     geminiPlaceholder: '예: 견적/도면/계약 관련 메일만 보고 싶어',
     geminiRun: 'Gemini로 분류',
     geminiHint: 'Gemini CLI 연동은 로컬 설정이 필요합니다. 연결되면 자동 분류됩니다.',
+    geminiRunning: 'Gemini 분류 중...',
+    geminiSuccess: (count) => `Gemini 분류 완료: ${count}개 매칭`,
+    geminiError: 'Gemini 서버에 연결할 수 없습니다.',
     fieldSubject: '제목',
     fieldBody: '본문',
     fieldFrom: '발신자',
@@ -109,6 +114,9 @@ const translations = {
     geminiPlaceholder: 'e.g., Only quotes/drawings/contracts',
     geminiRun: 'Classify with Gemini',
     geminiHint: 'Gemini CLI requires local setup. Once connected, it will auto-classify.',
+    geminiRunning: 'Running Gemini...',
+    geminiSuccess: (count) => `Gemini matched ${count} emails.`,
+    geminiError: 'Could not reach Gemini server.',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
     fieldFrom: 'Sender',
@@ -388,6 +396,63 @@ const applyTranslations = () => {
   renderSummary(state.summaryId);
 };
 
+const setGeminiStatus = (message) => {
+  if (!geminiStatus) return;
+  geminiStatus.textContent = message || '';
+};
+
+const applyGeminiMatches = (ids) => {
+  state.geminiMatches = new Set(ids);
+  state.emails = state.emails.map((email) => ({
+    ...email,
+    category: state.geminiMatches.has(email.id) ? 'gemini' : 'uncategorized',
+  }));
+  state.page = 1;
+  renderList();
+  renderSummary(state.summaryId);
+};
+
+const runGeminiClassification = async () => {
+  const t = translations[state.lang];
+  if (!geminiPrompt?.value?.trim()) {
+    setGeminiStatus(t.geminiPlaceholder);
+    return;
+  }
+  setGeminiStatus(t.geminiRunning);
+
+  const payload = {
+    prompt: geminiPrompt.value.trim(),
+    emails: state.emails.map((email) => ({
+      id: email.id,
+      subject: email.subject,
+      from: email.from,
+      snippet: email.snippet,
+      attachments: email.attachments,
+    })),
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch('http://localhost:8787/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('Gemini server error');
+    const data = await response.json();
+    const ids = Array.isArray(data.matches) ? data.matches : [];
+    applyGeminiMatches(ids);
+    setGeminiStatus(t.geminiSuccess(ids.length));
+    persistSnapshots();
+  } catch (error) {
+    setGeminiStatus(t.geminiError);
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const refreshCategories = () => {
   state.emails = state.emails.map((email) => ({
     ...email,
@@ -642,9 +707,6 @@ const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
 };
 
 const classify = (subject, body, attachments) => {
-  if (state.mode === 'gemini') {
-    return 'gemini';
-  }
   return 'uncategorized';
 };
 
@@ -784,6 +846,10 @@ const getFilteredEmails = () => {
   const fields = getActiveFields();
 
   return state.emails.filter((email) => {
+    if (state.mode === 'gemini') {
+      if (!state.geminiMatches) return false;
+      return state.geminiMatches.has(email.id);
+    }
     if (!query && !keywords.length) return true;
     if (!fields.length) return false;
 
@@ -888,10 +954,8 @@ if (geminiRun) {
   geminiRun.addEventListener('click', () => {
     if (state.mode !== 'gemini') {
       setMode('gemini');
-    } else {
-      refreshCategories();
     }
-    persistSnapshots();
+    runGeminiClassification();
   });
 }
 

@@ -1,0 +1,127 @@
+const http = require('http');
+const { spawn } = require('child_process');
+
+const PORT = process.env.GEMINI_PORT || 8787;
+
+const jsonResponse = (res, status, payload) => {
+  const body = JSON.stringify(payload);
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  });
+  res.end(body);
+};
+
+const parseJsonFromText = (text) => {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch (innerError) {
+        return null;
+      }
+    }
+  }
+  return null;
+};
+
+const buildPrompt = (prompt, emails) => {
+  const payload = emails.map((email) => ({
+    id: email.id,
+    subject: email.subject || '',
+    from: email.from || '',
+    snippet: email.snippet || '',
+    attachments: email.attachments || [],
+  }));
+
+  return [
+    'You are a classification assistant.',
+    `Task: Select email ids that match this criteria: "${prompt}".`,
+    'Return only JSON with this shape: {"matches":["id1","id2"],"notes":"optional"}',
+    'Use only the provided email data. No extra commentary.',
+    'Emails:',
+    JSON.stringify(payload),
+  ].join('\n');
+};
+
+const runGemini = (prompt, emails) =>
+  new Promise((resolve, reject) => {
+    const args = ['--prompt', buildPrompt(prompt, emails)];
+    const child = spawn('gemini', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString('utf-8');
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf-8');
+    });
+
+    child.on('error', (error) => {
+      reject(error);
+    });
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr || `Gemini exited with code ${code}`));
+        return;
+      }
+      const parsed = parseJsonFromText(stdout.trim());
+      if (!parsed || !Array.isArray(parsed.matches)) {
+        reject(new Error('Invalid Gemini response'));
+        return;
+      }
+      resolve(parsed);
+    });
+  });
+
+const server = http.createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    });
+    res.end();
+    return;
+  }
+
+  if (req.method !== 'POST' || req.url !== '/classify') {
+    jsonResponse(res, 404, { error: 'Not found' });
+    return;
+  }
+
+  let body = '';
+  req.on('data', (chunk) => {
+    body += chunk.toString('utf-8');
+  });
+
+  req.on('end', async () => {
+    try {
+      const payload = JSON.parse(body);
+      const { prompt, emails } = payload;
+      if (!prompt || !Array.isArray(emails)) {
+        jsonResponse(res, 400, { error: 'Invalid payload' });
+        return;
+      }
+      const result = await runGemini(prompt, emails);
+      jsonResponse(res, 200, result);
+    } catch (error) {
+      jsonResponse(res, 500, { error: error.message });
+    }
+  });
+});
+
+server.listen(PORT, () => {
+  // eslint-disable-next-line no-console
+  console.log(`Gemini bridge listening on http://localhost:${PORT}`);
+});
