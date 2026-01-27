@@ -12,12 +12,16 @@ const t = {
     summary: '요청한 기준에 맞는 메일을 모두 표시합니다.',
     fallbackUser: '요청한 기준이 없습니다.',
     fallbackAssistant: '요청하신 기준으로 메일을 분류해드리겠습니다.',
+    running: 'Gemini 분류 중...',
+    error: 'Gemini 분류에 실패했습니다.',
   },
   en: {
     empty: 'No emails to display.',
     summary: 'Showing all emails that match your criteria.',
     fallbackUser: 'No criteria provided.',
     fallbackAssistant: 'I will classify emails based on your criteria.',
+    running: 'Running Gemini...',
+    error: 'Gemini classification failed.',
   },
 };
 
@@ -123,6 +127,7 @@ const loadGeminiData = () => {
       prompt: gemini.prompt || paramRule || '',
       reply: gemini.reply || '',
       keywords: Array.isArray(gemini.keywords) ? gemini.keywords : [],
+      status: gemini.status || 'done',
       emails: selected,
     };
   } catch (error) {
@@ -130,14 +135,65 @@ const loadGeminiData = () => {
   }
 };
 
-const data = loadGeminiData();
-console.log('[gemini] loaded', data);
-summary.textContent = t[lang].summary;
-userBubble.textContent = data.prompt || t[lang].fallbackUser;
-assistantBubble.textContent = data.reply || t[lang].fallbackAssistant;
-if (data.keywords && data.keywords.length) {
-  const label = lang === 'ko' ? '키워드' : 'Keywords';
-  assistantBubble.textContent += `\n${label}: ${data.keywords.join(', ')}`;
-}
+const callGemini = async (prompt, emails) => {
+  const payload = {
+    prompt,
+    emails: emails.map((email) => ({
+      id: email.id,
+      subject: email.subject,
+      from: email.from,
+      snippet: email.snippet,
+      attachments: email.attachments,
+    })),
+  };
+  const response = await fetch('http://localhost:8787/classify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error || 'Gemini error');
+  return data;
+};
 
-renderList(data.emails);
+const renderAll = (data) => {
+  summary.textContent = t[lang].summary;
+  userBubble.textContent = data.prompt || t[lang].fallbackUser;
+  assistantBubble.textContent = data.reply || t[lang].fallbackAssistant;
+  if (data.keywords && data.keywords.length) {
+    const label = lang === 'ko' ? '키워드' : 'Keywords';
+    assistantBubble.textContent += `\n${label}: ${data.keywords.join(', ')}`;
+  }
+  renderList(data.emails || []);
+};
+
+const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
+const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : { emails: [] };
+const baseData = loadGeminiData();
+console.log('[gemini] loaded', baseData);
+renderAll(baseData);
+
+if (baseData.status === 'pending' && baseData.prompt) {
+  assistantBubble.textContent = t[lang].running;
+  callGemini(baseData.prompt, snapshot.emails || [])
+    .then((data) => {
+      const ids = Array.isArray(data.matches) ? data.matches : [];
+      const keywords = Array.isArray(data.keywords) ? data.keywords : [];
+      const results = (snapshot.emails || []).filter((email) => ids.includes(email.id));
+      const payload = {
+        prompt: baseData.prompt,
+        matches: ids,
+        keywords,
+        reply: data.reply || data.notes || t[lang].fallbackAssistant,
+        results,
+        status: 'done',
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+      sessionStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+      renderAll(payload);
+    })
+    .catch(() => {
+      assistantBubble.textContent = t[lang].error;
+    });
+}

@@ -1200,11 +1200,25 @@ if (resultButton) {
         resultButton.disabled = true;
         return;
       }
-      runGeminiClassification().then(() => {
-        persistSnapshots();
-        const ruleParam = encodeURIComponent(state.geminiRule.trim());
-        window.location.href = `/gemini?rule=${ruleParam}`;
-      });
+      const t = translations[state.lang];
+      try {
+        const seed = JSON.stringify({
+          prompt: state.geminiRule.trim(),
+          matches: [],
+          keywords: [],
+          reply: t.geminiDefaultReply,
+          results: [],
+          status: 'pending',
+          updatedAt: Date.now(),
+        });
+        localStorage.setItem(GEMINI_STORAGE_KEY, seed);
+        sessionStorage.setItem(GEMINI_STORAGE_KEY, seed);
+      } catch (error) {
+        // Ignore storage errors.
+      }
+      persistSnapshots();
+      const ruleParam = encodeURIComponent(state.geminiRule.trim());
+      window.location.href = `/gemini?rule=${ruleParam}`;
       return;
     }
     state.page = 1;
