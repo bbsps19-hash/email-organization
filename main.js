@@ -511,6 +511,20 @@ const renderFilterPanel = () => {
         if (resultButton) {
           resultButton.disabled = !state.geminiRule.trim();
         }
+        try {
+          const seed = JSON.stringify({
+            prompt: state.geminiRule.trim(),
+            matches: [],
+            keywords: [],
+            reply: t.geminiDefaultReply,
+            results: [],
+            updatedAt: Date.now(),
+          });
+          localStorage.setItem(GEMINI_STORAGE_KEY, seed);
+          sessionStorage.setItem(GEMINI_STORAGE_KEY, seed);
+        } catch (error) {
+          // Ignore storage errors.
+        }
       });
     }
     setGeminiStatusFromStorage();
@@ -1179,7 +1193,7 @@ if (resultButton) {
       runGeminiClassification().then(() => {
         persistSnapshots();
         const ruleParam = encodeURIComponent(state.geminiRule.trim());
-        window.location.href = `/gemini.html?rule=${ruleParam}`;
+        window.location.href = `/gemini?rule=${ruleParam}`;
       });
       return;
     }
