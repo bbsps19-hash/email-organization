@@ -9,6 +9,7 @@ const filterPanel = document.getElementById('filterPanel');
 const resultButton = document.getElementById('resultButton');
 const geminiResponse = document.getElementById('geminiResponse');
 const geminiResponseText = document.getElementById('geminiResponseText');
+const geminiKeywords = document.getElementById('geminiKeywords');
 const fieldCheckboxes = document.querySelectorAll('.field-checkbox');
 const pagination = document.getElementById('pagination');
 const tabButtons = document.querySelectorAll('.tab-button');
@@ -76,6 +77,7 @@ const translations = {
     geminiStored: '이전에 실행한 Gemini 결과가 있습니다.',
     geminiDefaultReply: '요청하신 기준으로 메일을 분류해드리겠습니다.',
     geminiResponseLabel: 'Gemini 답변',
+    geminiKeywordsLabel: 'Gemini 키워드',
     fieldSubject: '제목',
     fieldBody: '본문',
     fieldFrom: '발신자',
@@ -127,6 +129,7 @@ const translations = {
     geminiStored: 'Saved Gemini results are available.',
     geminiDefaultReply: 'I will classify emails based on your criteria.',
     geminiResponseLabel: 'Gemini Response',
+    geminiKeywordsLabel: 'Gemini Keywords',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
     fieldFrom: 'Sender',
@@ -399,6 +402,9 @@ const applyTranslations = () => {
   if (geminiResponseText) {
     geminiResponseText.textContent = t.geminiDefaultReply;
   }
+  if (geminiKeywords) {
+    geminiKeywords.textContent = '-';
+  }
 
   langButtons.forEach((button) => {
     button.classList.toggle('is-active', button.dataset.lang === state.lang);
@@ -434,6 +440,15 @@ const setGeminiResponse = (message) => {
   geminiResponseText.textContent = message;
 };
 
+const setGeminiKeywords = (keywords) => {
+  if (!geminiKeywords) return;
+  if (!Array.isArray(keywords) || !keywords.length) {
+    geminiKeywords.textContent = '-';
+    return;
+  }
+  geminiKeywords.textContent = keywords.join(', ');
+};
+
 const setGeminiStatusFromStorage = () => {
   const status = document.getElementById('geminiStatus');
   if (!status) return;
@@ -450,6 +465,9 @@ const setGeminiStatusFromStorage = () => {
     status.textContent = `${base} · ${t.geminiStored}`;
     if (data.reply) {
       setGeminiResponse(data.reply);
+    }
+    if (data.keywords) {
+      setGeminiKeywords(data.keywords);
     }
   } catch (error) {
     // Ignore storage errors.
@@ -535,11 +553,13 @@ const runGeminiClassification = async () => {
       throw new Error(message);
     }
     const ids = Array.isArray(data.matches) ? data.matches : [];
+    const keywords = Array.isArray(data.keywords) ? data.keywords : [];
     applyGeminiMatches(ids);
     const reply = data.reply || data.notes || t.geminiDefaultReply;
     const payload = {
       prompt: state.geminiRule || '',
       matches: ids,
+      keywords,
       reply,
       updatedAt: Date.now(),
     };
@@ -550,6 +570,7 @@ const runGeminiClassification = async () => {
     }
     setGeminiStatus(t.geminiSuccess(ids.length));
     setGeminiResponse(reply);
+    setGeminiKeywords(keywords);
     persistSnapshots();
   } catch (error) {
     const message = String(error?.message || '');

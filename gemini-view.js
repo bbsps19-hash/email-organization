@@ -4,6 +4,7 @@ const pagination = document.getElementById('geminiPagination');
 const summary = document.getElementById('geminiSummary');
 const userBubble = document.getElementById('geminiUser');
 const assistantBubble = document.getElementById('geminiAssistant');
+const summary = document.getElementById('geminiSummary');
 
 const lang = localStorage.getItem('emailOrganizerLang') || 'ko';
 const t = {
@@ -112,6 +113,7 @@ const loadGeminiData = () => {
       matches,
       prompt: gemini.prompt || '',
       reply: gemini.reply || '',
+      keywords: Array.isArray(gemini.keywords) ? gemini.keywords : [],
       emails: selected,
     };
   } catch (error) {
@@ -123,5 +125,9 @@ const data = loadGeminiData();
 summary.textContent = t[lang].summary;
 userBubble.textContent = data.prompt || t[lang].fallbackUser;
 assistantBubble.textContent = data.reply || t[lang].fallbackAssistant;
+if (data.keywords && data.keywords.length) {
+  const label = lang === 'ko' ? '키워드' : 'Keywords';
+  assistantBubble.textContent += `\n${label}: ${data.keywords.join(', ')}`;
+}
 
 renderList(data.emails);
