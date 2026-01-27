@@ -31,15 +31,7 @@ const parseJsonFromText = (text) => {
   return null;
 };
 
-const buildPrompt = (prompt, emails) => {
-  const payload = emails.map((email) => ({
-    id: email.id,
-    subject: email.subject || '',
-    from: email.from || '',
-    snippet: email.snippet || '',
-    attachments: email.attachments || [],
-  }));
-
+const buildPrompt = (prompt) => {
   return [
     'You are a classification assistant.',
     '당신은 이메일 분류 도우미입니다.',
@@ -49,16 +41,24 @@ const buildPrompt = (prompt, emails) => {
     '조건과 매칭 결과를 요약하는 키워드 3~8개를 추출하세요.',
     'Return only JSON with this shape: {"matches":["id1","id2"],"keywords":["k1","k2"],"notes":"optional"}',
     'JSON만 출력하고 다른 설명/마크다운은 포함하지 마세요.',
-    'Use only the provided email data. No extra commentary.',
-    'Emails:',
-    JSON.stringify(payload),
+    'Emails JSON will be provided via stdin.',
   ].join('\n');
+};
+
+const buildEmailPayload = (emails) => {
+  return emails.map((email) => ({
+    id: email.id,
+    subject: email.subject || '',
+    from: email.from || '',
+    snippet: email.snippet || '',
+    attachments: email.attachments || [],
+  }));
 };
 
 const runGemini = (prompt, emails) =>
   new Promise((resolve, reject) => {
-    const args = ['--output-format', 'json', buildPrompt(prompt, emails)];
-    const child = spawn('gemini', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const args = ['--output-format', 'json', '--model', 'gemini-2.5-flash-lite', '--prompt', buildPrompt(prompt)];
+    const child = spawn('gemini', args, { stdio: ['pipe', 'pipe', 'pipe'] });
 
     let stdout = '';
     let stderr = '';
@@ -98,6 +98,14 @@ const runGemini = (prompt, emails) =>
       }
       resolve(parsed);
     });
+
+    try {
+      const payload = JSON.stringify(buildEmailPayload(emails));
+      child.stdin.write(payload);
+      child.stdin.end();
+    } catch (error) {
+      child.stdin.end();
+    }
   });
 
 const server = http.createServer(async (req, res) => {
