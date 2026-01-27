@@ -138,6 +138,120 @@ const formatSize = (bytes) => {
   return `${size} ${units[idx]}`;
 };
 
+const normalizeCharset = (value) => {
+  if (!value) return 'utf-8';
+  const cleaned = value.toLowerCase().replace(/["']/g, '').trim();
+  const map = {
+    utf8: 'utf-8',
+    'utf-8': 'utf-8',
+    'us-ascii': 'windows-1252',
+    latin1: 'iso-8859-1',
+    'iso-8859-1': 'iso-8859-1',
+    'iso8859-1': 'iso-8859-1',
+    'windows-1252': 'windows-1252',
+    'ks_c_5601-1987': 'euc-kr',
+    'euc-kr': 'euc-kr',
+    'cp949': 'euc-kr',
+    'shift_jis': 'shift_jis',
+    'sjis': 'shift_jis',
+    'cp932': 'shift_jis',
+    'gbk': 'gbk',
+    'gb2312': 'gbk',
+  };
+  return map[cleaned] || cleaned;
+};
+
+const decodeBytes = (bytes, charset) => {
+  const normalized = normalizeCharset(charset);
+  try {
+    return new TextDecoder(normalized, { fatal: false }).decode(bytes);
+  } catch (error) {
+    return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  }
+};
+
+const decodeQpToBytes = (input) => {
+  const cleaned = input.replace(/=\r?\n/g, '');
+  const bytes = [];
+  for (let i = 0; i < cleaned.length; i += 1) {
+    const char = cleaned[i];
+    if (char === '=' && /[0-9A-Fa-f]{2}/.test(cleaned.slice(i + 1, i + 3))) {
+      bytes.push(parseInt(cleaned.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(char.charCodeAt(0));
+    }
+  }
+  return new Uint8Array(bytes);
+};
+
+const decodeMimeWords = (value) => {
+  if (!value) return '';
+  return value.replace(/=\?([^?]+)\?([bqBQ])\?([^?]+)\?=/g, (match, charset, enc, text) => {
+    const encoding = enc.toLowerCase();
+    let bytes;
+    if (encoding === 'b') {
+      try {
+        const binary = atob(text.replace(/\s+/g, ''));
+        bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+      } catch (error) {
+        return match;
+      }
+    } else {
+      const normalized = text.replace(/_/g, ' ');
+      bytes = decodeQpToBytes(normalized);
+    }
+    return decodeBytes(bytes, charset);
+  });
+};
+
+const parseHeaderParams = (value) => {
+  if (!value) return { mime: '', params: {} };
+  const [mime, ...rest] = value.split(';');
+  const params = {};
+  rest.forEach((part) => {
+    const [key, ...valParts] = part.split('=');
+    if (!key) return;
+    const rawValue = valParts.join('=').trim();
+    if (!rawValue) return;
+    params[key.trim().toLowerCase()] = rawValue.replace(/(^\"|\"$)/g, '');
+  });
+  return { mime: mime.trim().toLowerCase(), params };
+};
+
+const latin1FromBuffer = (buffer) =>
+  new TextDecoder('iso-8859-1', { fatal: false }).decode(buffer);
+
+const latin1ToBytes = (text) => Uint8Array.from(text, (ch) => ch.charCodeAt(0));
+
+const decodeBodyWithEncoding = (bodyText, transferEncoding, charset) => {
+  const encoding = (transferEncoding || '').toLowerCase();
+  let bytes;
+  if (encoding === 'base64') {
+    try {
+      const sanitized = bodyText.replace(/\s+/g, '');
+      const binary = atob(sanitized);
+      bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+    } catch (error) {
+      bytes = latin1ToBytes(bodyText);
+    }
+  } else if (encoding === 'quoted-printable') {
+    bytes = decodeQpToBytes(bodyText);
+  } else {
+    bytes = latin1ToBytes(bodyText);
+  }
+  return decodeBytes(bytes, charset || 'utf-8');
+};
+
+const splitMultipart = (bodyText, boundary) => {
+  if (!boundary) return [];
+  const boundaryText = `--${boundary}`;
+  const parts = bodyText.split(boundaryText).slice(1);
+  return parts
+    .map((part) => part.replace(/^\r?\n/, '').replace(/\r?\n--\s*$/, '').trim())
+    .filter(Boolean);
+};
+
 const setWarning = (invalidCount, total) => {
   const t = translations[state.lang];
   if (total === 0 || invalidCount === 0) {
@@ -248,7 +362,7 @@ const parseHeaders = (rawHeaders) => {
     const idx = line.indexOf(':');
     if (idx === -1) return;
     const key = line.slice(0, idx).toLowerCase();
-    const value = line.slice(idx + 1).trim();
+    const value = decodeMimeWords(line.slice(idx + 1).trim());
     headers[key] = headers[key] ? `${headers[key]}, ${value}` : value;
   });
   return headers;
@@ -259,21 +373,80 @@ const cleanBody = (body) => {
   return withoutHtml.replace(/\s+/g, ' ').trim();
 };
 
+const decodeRfc2231 = (value) => {
+  if (!value) return '';
+  const cleaned = value.replace(/(^\"|\"$)/g, '');
+  if (!cleaned.includes("''")) return cleaned;
+  const [, encoded] = cleaned.split("''");
+  try {
+    return decodeURIComponent(encoded);
+  } catch (error) {
+    return cleaned;
+  }
+};
+
+const extractFilenameFromHeaders = (headers) => {
+  const disposition = headers['content-disposition'] || '';
+  const type = headers['content-type'] || '';
+  const dispositionParams = parseHeaderParams(disposition).params;
+  const typeParams = parseHeaderParams(type).params;
+  const raw = dispositionParams['filename*'] || dispositionParams.filename || typeParams['name*'] || typeParams.name;
+  if (!raw) return '';
+  return decodeMimeWords(decodeRfc2231(raw)).trim();
+};
+
 const extractAttachments = (text) => {
   const names = new Set();
   const filenameRegex = /filename\\*?=\\??\"?([^\";\\r\\n]+)/gi;
   const nameRegex = /name\\*?=\\??\"?([^\";\\r\\n]+)/gi;
   let match = filenameRegex.exec(text);
   while (match) {
-    names.add(match[1].trim());
+    names.add(decodeMimeWords(decodeRfc2231(match[1].trim())));
     match = filenameRegex.exec(text);
   }
   match = nameRegex.exec(text);
   while (match) {
-    names.add(match[1].trim());
+    names.add(decodeMimeWords(decodeRfc2231(match[1].trim())));
     match = nameRegex.exec(text);
   }
   return Array.from(names).filter(Boolean);
+};
+
+const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
+  const [rawHeaders = '', rawBody = ''] = rawPart.split(/\r?\n\r?\n/);
+  const headers = parseHeaders(rawHeaders);
+  const contentType = headers['content-type'] || 'text/plain';
+  const { mime, params } = parseHeaderParams(contentType);
+  const charset = params.charset || inheritedCharset;
+  const transfer = headers['content-transfer-encoding'] || '';
+
+  if (mime.startsWith('multipart/')) {
+    const boundary = params.boundary;
+    const subparts = splitMultipart(rawBody, boundary);
+    return subparts.reduce(
+      (acc, part) => {
+        const parsed = parsePart(part, charset);
+        acc.texts.push(...parsed.texts);
+        acc.attachments.push(...parsed.attachments);
+        return acc;
+      },
+      { texts: [], attachments: [] }
+    );
+  }
+
+  const filename = extractFilenameFromHeaders(headers);
+  const disposition = (headers['content-disposition'] || '').toLowerCase();
+  const attachments = [];
+  if (filename || disposition.includes('attachment')) {
+    attachments.push(filename || 'attachment');
+  }
+
+  const decoded = decodeBodyWithEncoding(rawBody, transfer, charset);
+  if (mime.startsWith('text/')) {
+    return { texts: [{ mime, text: decoded }], attachments };
+  }
+
+  return { texts: [], attachments };
 };
 
 const classify = (subject, body, attachments) => {
@@ -313,15 +486,39 @@ const renderSummary = (id) => {
   metaSnippet.textContent = email.snippet || '-';
 };
 
-const parseEml = (text) => {
-  const [rawHeaders = '', rawBody = ''] = text.split(/\\r?\\n\\r?\\n/);
+const parseEml = (buffer) => {
+  const rawText = latin1FromBuffer(buffer);
+  const [rawHeaders = '', rawBody = ''] = rawText.split(/\r?\n\r?\n/);
   const headers = parseHeaders(rawHeaders);
   const subject = headers.subject || '';
   const from = headers.from || '';
   const to = headers.to || '';
   const date = headers.date || '';
-  const attachments = extractAttachments(text);
-  const body = cleanBody(rawBody);
+
+  const { mime, params } = parseHeaderParams(headers['content-type'] || 'text/plain');
+  let texts = [];
+  let attachments = [];
+  if (mime.startsWith('multipart/')) {
+    const boundary = params.boundary;
+    const parts = splitMultipart(rawBody, boundary);
+    parts.forEach((part) => {
+      const parsed = parsePart(part, params.charset || 'utf-8');
+      texts = texts.concat(parsed.texts);
+      attachments = attachments.concat(parsed.attachments);
+    });
+  } else {
+    const transfer = headers['content-transfer-encoding'] || '';
+    const charset = params.charset || 'utf-8';
+    const decoded = decodeBodyWithEncoding(rawBody, transfer, charset);
+    texts = [{ mime: mime || 'text/plain', text: decoded }];
+  }
+
+  if (!attachments.length) {
+    attachments = extractAttachments(rawText);
+  }
+
+  const preferred = texts.find((part) => part.mime === 'text/plain') || texts[0];
+  const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
   const category = classify(subject, body, attachments);
 
@@ -393,8 +590,8 @@ const handleFiles = async (fileListInput) => {
 
   const parsed = await Promise.all(
     validFiles.map(async (file) => {
-      const content = await file.text();
-      const data = parseEml(content);
+      const buffer = await file.arrayBuffer();
+      const data = parseEml(buffer);
       return {
         id: crypto.randomUUID(),
         fileName: file.name,
