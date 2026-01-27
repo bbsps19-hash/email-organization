@@ -5,14 +5,12 @@ const emptyState = document.querySelector('.file-empty');
 const warning = document.getElementById('warning');
 const langButtons = document.querySelectorAll('.lang-btn');
 
-const searchInput = document.getElementById('searchInput');
+const filterPanel = document.getElementById('filterPanel');
+const resultButton = document.getElementById('resultButton');
 const fieldCheckboxes = document.querySelectorAll('.field-checkbox');
 const pagination = document.getElementById('pagination');
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('[data-panel]');
-const geminiPrompt = document.getElementById('geminiPrompt');
-const geminiRun = document.getElementById('geminiRun');
-const geminiStatus = document.getElementById('geminiStatus');
 
 const metaSubject = document.getElementById('metaSubject');
 const metaFrom = document.getElementById('metaFrom');
@@ -31,6 +29,8 @@ const state = {
   emails: [],
   page: 1,
   mode: 'search',
+  searchQuery: '',
+  geminiRule: '',
   geminiMatches: null,
 };
 
@@ -65,7 +65,7 @@ const translations = {
     tabGemini: 'Gemini 분류',
     geminiPrompt: '분류 기준 설명',
     geminiPlaceholder: '예: 견적/도면/계약 관련 메일만 보고 싶어',
-    geminiRun: 'Gemini로 분류',
+    resultButton: '결과 보기',
     geminiHint: 'Gemini CLI 연동은 로컬 설정이 필요합니다. 연결되면 자동 분류됩니다.',
     geminiRunning: 'Gemini 분류 중...',
     geminiSuccess: (count) => `Gemini 분류 완료: ${count}개 매칭`,
@@ -114,7 +114,7 @@ const translations = {
     tabGemini: 'Gemini',
     geminiPrompt: 'Describe your criteria',
     geminiPlaceholder: 'e.g., Only quotes/drawings/contracts',
-    geminiRun: 'Classify with Gemini',
+    resultButton: 'View results',
     geminiHint: 'Gemini CLI requires local setup. Once connected, it will auto-classify.',
     geminiRunning: 'Running Gemini...',
     geminiSuccess: (count) => `Gemini matched ${count} emails.`,
@@ -387,6 +387,9 @@ const applyTranslations = () => {
       node.setAttribute('placeholder', t[key]);
     }
   });
+  if (resultButton) {
+    resultButton.textContent = t.resultButton;
+  }
 
   langButtons.forEach((button) => {
     button.classList.toggle('is-active', button.dataset.lang === state.lang);
@@ -396,6 +399,7 @@ const applyTranslations = () => {
     setWarning(state.warning.invalidCount, state.warning.total);
   }
 
+  renderFilterPanel();
   renderList();
   renderSummary(state.summaryId);
   try {
@@ -406,12 +410,14 @@ const applyTranslations = () => {
 };
 
 const setGeminiStatus = (message) => {
-  if (!geminiStatus) return;
-  geminiStatus.textContent = message || '';
+  const status = document.getElementById('geminiStatus');
+  if (!status) return;
+  status.textContent = message || '';
 };
 
 const setGeminiStatusFromStorage = () => {
-  if (!geminiStatus) return;
+  const status = document.getElementById('geminiStatus');
+  if (!status) return;
   const t = translations[state.lang];
   try {
     const raw = localStorage.getItem('emailOrganizerGemini');
@@ -422,9 +428,42 @@ const setGeminiStatusFromStorage = () => {
     const timestamp = time ? time.toLocaleString(state.lang === 'ko' ? 'ko-KR' : 'en-US') : '';
     const message = t.geminiSuccess(data.matches.length);
     const base = timestamp ? `${message} (${timestamp})` : message;
-    geminiStatus.textContent = `${base} · ${t.geminiStored}`;
+    status.textContent = `${base} · ${t.geminiStored}`;
   } catch (error) {
     // Ignore storage errors.
+  }
+};
+
+const renderFilterPanel = () => {
+  if (!filterPanel) return;
+  const t = translations[state.lang];
+  if (state.mode === 'search') {
+    filterPanel.innerHTML = `
+      <label class="filter-label" for="searchInput" data-i18n="filterSearch">${t.filterSearch}</label>
+      <input id="searchInput" type="text" placeholder="${t.filterPlaceholder}" />
+    `;
+    const input = document.getElementById('searchInput');
+    if (input) {
+      input.value = state.searchQuery;
+      input.addEventListener('input', () => {
+        state.searchQuery = input.value;
+      });
+    }
+  } else {
+    filterPanel.innerHTML = `
+      <label class="filter-label" for="geminiPrompt" data-i18n="geminiPrompt">${t.geminiPrompt}</label>
+      <textarea id="geminiPrompt" rows="4" placeholder="${t.geminiPlaceholder}">${state.geminiRule}</textarea>
+      <p class="hint" data-i18n="geminiHint">${t.geminiHint}</p>
+      <p class="hint" id="geminiStatus" aria-live="polite"></p>
+    `;
+    const textarea = document.getElementById('geminiPrompt');
+    if (textarea) {
+      textarea.value = state.geminiRule;
+      textarea.addEventListener('input', () => {
+        state.geminiRule = textarea.value;
+      });
+    }
+    setGeminiStatusFromStorage();
   }
 };
 
@@ -441,14 +480,14 @@ const applyGeminiMatches = (ids) => {
 
 const runGeminiClassification = async () => {
   const t = translations[state.lang];
-  if (!geminiPrompt?.value?.trim()) {
+  if (!state.geminiRule.trim()) {
     setGeminiStatus(t.geminiPlaceholder);
     return;
   }
   setGeminiStatus(t.geminiRunning);
 
   const payload = {
-    prompt: geminiPrompt.value.trim(),
+    prompt: state.geminiRule.trim(),
     emails: state.emails.map((email) => ({
       id: email.id,
       subject: email.subject,
@@ -475,7 +514,7 @@ const runGeminiClassification = async () => {
     const ids = Array.isArray(data.matches) ? data.matches : [];
     applyGeminiMatches(ids);
     const payload = {
-      prompt: geminiPrompt?.value || '',
+      prompt: state.geminiRule || '',
       matches: ids,
       updatedAt: Date.now(),
     };
@@ -553,9 +592,9 @@ const persistSnapshots = () => {
         emails: filtered.map(serialize),
         filters: {
           mode: state.mode,
-          query: searchInput.value,
+          query: state.searchQuery,
           fields: getActiveFields(),
-          geminiPrompt: geminiPrompt?.value || '',
+          geminiPrompt: state.geminiRule || '',
         },
       })
     );
@@ -892,7 +931,7 @@ const getActiveFields = () => {
 };
 
 const getFilteredEmails = () => {
-  const query = searchInput.value.trim().toLowerCase();
+  const query = state.searchQuery.trim().toLowerCase();
   const keywords = query
     .split(',')
     .map((term) => term.trim())
@@ -901,9 +940,7 @@ const getFilteredEmails = () => {
 
   return state.emails.filter((email) => {
     if (state.mode === 'gemini') {
-      if (!state.geminiMatches || state.geminiMatches.size === 0) {
-        return true;
-      }
+      if (!state.geminiMatches) return true;
       return state.geminiMatches.has(email.id);
     }
     if (!query && !keywords.length) return true;
@@ -1006,15 +1043,6 @@ tabButtons.forEach((button) => {
   });
 });
 
-if (geminiRun) {
-  geminiRun.addEventListener('click', () => {
-    if (state.mode !== 'gemini') {
-      setMode('gemini');
-    }
-    runGeminiClassification();
-  });
-}
-
 langButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const nextLang = button.dataset.lang;
@@ -1025,10 +1053,21 @@ langButtons.forEach((button) => {
   });
 });
 
-searchInput.addEventListener('input', () => {
-  state.page = 1;
-  renderList();
-});
+if (resultButton) {
+  resultButton.addEventListener('click', () => {
+    if (state.mode === 'gemini') {
+      runGeminiClassification().then(() => {
+        persistSnapshots();
+        window.location.href = '/eml.html';
+      });
+      return;
+    }
+    state.page = 1;
+    renderList();
+    persistSnapshots();
+    window.location.href = '/eml.html';
+  });
+}
 fieldCheckboxes.forEach((checkbox) => {
   checkbox.addEventListener('change', () => {
     state.page = 1;

@@ -59,18 +59,8 @@
         <button type="button" class="tab-button" data-tab="gemini" role="tab" aria-selected="false" data-i18n="tabGemini">Gemini 분류</button>
       </div>
 
-      <div class="filter-controls" data-panel="search">
-        <label class="filter-label" for="searchInput" data-i18n="filterSearch">검색</label>
-        <input id="searchInput" type="text" placeholder="키워드(쉼표로 구분), 제목, 본문, 발신자, 첨부파일명" data-i18n-placeholder="filterPlaceholder" />
-      </div>
-
-      <div class="filter-controls" data-panel="gemini" hidden>
-        <label class="filter-label" for="geminiPrompt" data-i18n="geminiPrompt">분류 기준 설명</label>
-        <textarea id="geminiPrompt" rows="4" placeholder="예: 견적/도면/계약 관련 메일만 보고 싶어" data-i18n-placeholder="geminiPlaceholder"></textarea>
-        <button type="button" class="file-button" id="geminiRun" data-i18n="geminiRun">Gemini로 분류</button>
-        <p class="hint" data-i18n="geminiHint">Gemini CLI 연동은 로컬 설정이 필요합니다. 연결되면 자동 분류됩니다.</p>
-        <p class="hint" id="geminiStatus" aria-live="polite"></p>
-      </div>
+      <div class="filter-controls" id="filterPanel"></div>
+      <button type="button" class="file-button" id="resultButton" data-i18n="resultButton">결과 보기</button>
 
       <a class="file-button link-button" href="/eml.html" data-i18n="viewFiltered">필터 결과 보기</a>
     </section>
