@@ -526,6 +526,21 @@ const runGeminiClassification = async () => {
     return;
   }
   setGeminiStatus(t.geminiRunning);
+  setGeminiResponse(t.geminiDefaultReply);
+  try {
+    localStorage.setItem(
+      'emailOrganizerGemini',
+      JSON.stringify({
+        prompt: state.geminiRule.trim(),
+        matches: [],
+        keywords: [],
+        reply: t.geminiDefaultReply,
+        updatedAt: Date.now(),
+      })
+    );
+  } catch (error) {
+    // Ignore storage errors.
+  }
 
   const payload = {
     prompt: state.geminiRule.trim(),
