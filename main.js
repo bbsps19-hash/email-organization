@@ -412,6 +412,7 @@ const applyTranslations = () => {
   });
   if (resultButton) {
     resultButton.textContent = t.resultButton;
+    resultButton.disabled = state.mode === 'gemini' && !state.geminiRule.trim();
   }
   if (resultButton) {
     resultButton.disabled = state.mode === 'gemini' && !state.geminiRule.trim();
@@ -679,6 +680,9 @@ const setMode = (mode) => {
   if (mode !== 'gemini') {
     state.geminiMatches = null;
     setGeminiStatus('');
+  }
+  if (resultButton) {
+    resultButton.disabled = mode === 'gemini' && !state.geminiRule.trim();
   }
   try {
     localStorage.setItem(TAB_STORAGE_KEY, mode);
