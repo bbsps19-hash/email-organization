@@ -9,11 +9,8 @@ const state = {
 };
 
 const categoryLabels = {
-  work: '업무',
-  finance: '결제/영수증',
-  marketing: '프로모션',
-  security: '보안/계정',
-  personal: '개인',
+  uncategorized: '미분류',
+  gemini: 'Gemini',
 };
 
 const renderList = (emails) => {
@@ -45,9 +42,9 @@ const renderList = (emails) => {
       <span>${email.attachments?.length ? email.attachments.join(', ') : '-'}</span>
     `;
 
-    const badge = document.createElement('span');
-    badge.className = 'file-badge';
-    badge.textContent = categoryLabels[email.category] || '-';
+  const badge = document.createElement('span');
+  badge.className = 'file-badge';
+  badge.textContent = categoryLabels[email.category] || '-';
 
     const snippet = document.createElement('p');
     snippet.className = 'snippet';
@@ -96,11 +93,16 @@ const loadData = () => {
 const { emails, filters } = loadData();
 if (filters) {
   const parts = [];
-  if (filters.category && filters.category !== 'all') {
-    parts.push(`카테고리: ${categoryLabels[filters.category] || filters.category}`);
-  }
-  if (filters.query) {
-    parts.push(`검색어: ${filters.query}`);
+  if (filters.mode === 'gemini') {
+    parts.push('모드: Gemini');
+    if (filters.geminiPrompt) {
+      parts.push(`기준: ${filters.geminiPrompt}`);
+    }
+  } else {
+    parts.push('모드: 검색');
+    if (filters.query) {
+      parts.push(`검색어: ${filters.query}`);
+    }
   }
   filterInfo.textContent = parts.length ? `현재 필터: ${parts.join(' / ')}` : '현재 필터 조건에 해당하는 .eml 목록입니다.';
 }

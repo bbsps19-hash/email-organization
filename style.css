@@ -167,7 +167,8 @@ body {
 }
 
 .filter-controls select,
-.filter-controls input[type="text"] {
+.filter-controls input[type="text"],
+.filter-controls textarea {
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.15);
   padding: 10px 12px;

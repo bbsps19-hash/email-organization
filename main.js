@@ -5,15 +5,13 @@ const emptyState = document.querySelector('.file-empty');
 const warning = document.getElementById('warning');
 const langButtons = document.querySelectorAll('.lang-btn');
 
-const categoryFilter = document.getElementById('categoryFilter');
 const searchInput = document.getElementById('searchInput');
-const searchInputRules = document.getElementById('searchInputRules');
-const keywordInput = document.getElementById('keywordInput');
 const fieldCheckboxes = document.querySelectorAll('.field-checkbox');
-const ruleInputs = document.querySelectorAll('[data-rule]');
 const pagination = document.getElementById('pagination');
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('[data-panel]');
+const geminiPrompt = document.getElementById('geminiPrompt');
+const geminiRun = document.getElementById('geminiRun');
 
 const metaSubject = document.getElementById('metaSubject');
 const metaFrom = document.getElementById('metaFrom');
@@ -32,13 +30,6 @@ const state = {
   emails: [],
   page: 1,
   mode: 'search',
-  rules: {
-    work: ['meeting', 'project', 'deadline', 'report', 'proposal', 'client', '회의', '프로젝트', '마감', '보고', '업무'],
-    finance: ['invoice', 'receipt', 'payment', 'order', 'refund', 'billing', '결제', '영수증', '청구', '주문', '환불'],
-    marketing: ['sale', 'discount', 'promo', 'newsletter', 'subscribe', 'unsubscribe', '광고', '할인', '프로모션', '뉴스레터'],
-    security: ['password', 'verification', 'security', 'alert', 'otp', '보안', '인증', '확인 코드', '로그인'],
-    personal: ['family', 'friend', 'party', 'invitation', 'personal', '가족', '친구', '모임', '초대'],
-  },
 };
 
 const translations = {
@@ -65,27 +56,20 @@ const translations = {
     summarySnippet: '본문 미리보기',
     summaryAttachments: '첨부파일 다운로드',
     filterTitle: '필터 & 분류 규칙',
-    filterHint: '필터 탭을 선택해 메일을 빠르게 찾거나 자동 분류를 설정하세요.',
-    filterCategory: '카테고리',
-    filterAll: '전체',
+    filterHint: '검색 또는 Gemini 분류 탭을 선택하세요.',
     filterSearch: '검색',
-    filterPlaceholder: '제목, 본문, 발신자, 첨부파일명',
+    filterPlaceholder: '키워드(쉼표로 구분), 제목, 본문, 발신자, 첨부파일명',
     tabSearch: '검색 엔진',
-    tabRules: '분류 규칙',
-    keywordLabel: '키워드',
-    keywordPlaceholder: '키워드 여러 개는 쉼표로 구분',
+    tabGemini: 'Gemini 분류',
+    geminiPrompt: '분류 기준 설명',
+    geminiPlaceholder: '예: 견적/도면/계약 관련 메일만 보고 싶어',
+    geminiRun: 'Gemini로 분류',
+    geminiHint: 'Gemini CLI 연동은 로컬 설정이 필요합니다. 연결되면 자동 분류됩니다.',
     fieldSubject: '제목',
     fieldBody: '본문',
     fieldFrom: '발신자',
     fieldAttachments: '첨부파일명',
-    ruleTitle: '키워드 규칙',
-    ruleHint: '쉼표로 키워드를 구분하세요. 수정하면 자동 분류가 갱신됩니다.',
     viewFiltered: '필터 결과 보기',
-    categoryWork: '업무',
-    categoryFinance: '결제/영수증',
-    categoryMarketing: '프로모션',
-    categorySecurity: '보안/계정',
-    categoryPersonal: '개인',
     dropAria: '.eml 파일을 여기로 드롭하세요',
     warningInvalid: (count) => `.eml이 아닌 파일 ${count}개는 제외되었습니다.`,
     warningNone: '선택한 파일 중 .eml 형식이 없습니다.',
@@ -115,28 +99,21 @@ const translations = {
     summaryCategory: 'Auto Category',
     summarySnippet: 'Body Preview',
     summaryAttachments: 'Attachments',
-    filterTitle: 'Filters & Rules',
-    filterHint: 'Pick a tab to search quickly or apply rule-based classification.',
-    filterCategory: 'Category',
-    filterAll: 'All',
+    filterTitle: 'Filters & Classification',
+    filterHint: 'Choose Search or Gemini tab.',
     filterSearch: 'Search',
-    filterPlaceholder: 'Subject, body, sender, attachment name',
+    filterPlaceholder: 'Keywords (comma-separated), subject, body, sender, attachment name',
     tabSearch: 'Search',
-    tabRules: 'Rules',
-    keywordLabel: 'Keywords',
-    keywordPlaceholder: 'Separate keywords with commas',
+    tabGemini: 'Gemini',
+    geminiPrompt: 'Describe your criteria',
+    geminiPlaceholder: 'e.g., Only quotes/drawings/contracts',
+    geminiRun: 'Classify with Gemini',
+    geminiHint: 'Gemini CLI requires local setup. Once connected, it will auto-classify.',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
     fieldFrom: 'Sender',
     fieldAttachments: 'Attachments',
-    ruleTitle: 'Keyword Rules',
-    ruleHint: 'Separate keywords with commas. Updates classification automatically.',
     viewFiltered: 'View filtered emails',
-    categoryWork: 'Work',
-    categoryFinance: 'Payments/Receipts',
-    categoryMarketing: 'Promotion',
-    categorySecurity: 'Security/Account',
-    categoryPersonal: 'Personal',
     dropAria: 'Drop .eml files here',
     warningInvalid: (count) => `Excluded ${count} non-.eml file(s).`,
     warningNone: 'No valid .eml files were selected.',
@@ -147,11 +124,8 @@ const translations = {
 };
 
 const categoryLabels = {
-  work: { ko: '업무', en: 'Work' },
-  finance: { ko: '결제/영수증', en: 'Payments/Receipts' },
-  marketing: { ko: '프로모션', en: 'Promotion' },
-  security: { ko: '보안/계정', en: 'Security/Account' },
-  personal: { ko: '개인', en: 'Personal' },
+  uncategorized: { ko: '미분류', en: 'Uncategorized' },
+  gemini: { ko: 'Gemini', en: 'Gemini' },
 };
 
 const isEmlFile = (file) =>
@@ -414,6 +388,15 @@ const applyTranslations = () => {
   renderSummary(state.summaryId);
 };
 
+const refreshCategories = () => {
+  state.emails = state.emails.map((email) => ({
+    ...email,
+    category: classify(email.subject, email.body, email.attachments),
+  }));
+  renderList();
+  renderSummary(state.summaryId);
+};
+
 const setMode = (mode) => {
   state.mode = mode;
   tabButtons.forEach((button) => {
@@ -425,7 +408,7 @@ const setMode = (mode) => {
     panel.hidden = panel.dataset.panel !== mode;
   });
   state.page = 1;
-  renderList();
+  refreshCategories();
 };
 
 const persistSnapshots = () => {
@@ -454,10 +437,9 @@ const persistSnapshots = () => {
         emails: filtered.map(serialize),
         filters: {
           mode: state.mode,
-          category: categoryFilter.value,
-          query: state.mode === 'rules' ? searchInputRules.value : searchInput.value,
-          keywords: keywordInput.value,
+          query: searchInput.value,
           fields: getActiveFields(),
+          geminiPrompt: geminiPrompt?.value || '',
         },
       })
     );
@@ -660,17 +642,10 @@ const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
 };
 
 const classify = (subject, body, attachments) => {
-  const text = `${subject} ${body} ${attachments.join(' ')}`.toLowerCase();
-  let best = { key: 'personal', score: 0 };
-
-  Object.entries(state.rules).forEach(([key, terms]) => {
-    const score = terms.reduce((acc, term) => acc + (text.includes(term.toLowerCase()) ? 1 : 0), 0);
-    if (score > best.score) {
-      best = { key, score };
-    }
-  });
-
-  return best.key;
+  if (state.mode === 'gemini') {
+    return 'gemini';
+  }
+  return 'uncategorized';
 };
 
 const renderSummary = (id) => {
@@ -801,18 +776,14 @@ const getActiveFields = () => {
 };
 
 const getFilteredEmails = () => {
-  const category = categoryFilter.value;
-  const query = (state.mode === 'rules' ? searchInputRules.value : searchInput.value).trim().toLowerCase();
-  const keywords = keywordInput.value
+  const query = searchInput.value.trim().toLowerCase();
+  const keywords = query
     .split(',')
-    .map((term) => term.trim().toLowerCase())
+    .map((term) => term.trim())
     .filter(Boolean);
   const fields = getActiveFields();
 
   return state.emails.filter((email) => {
-    if (state.mode === 'rules' && category !== 'all' && email.category !== category) {
-      return false;
-    }
     if (!query && !keywords.length) return true;
     if (!fields.length) return false;
 
@@ -823,35 +794,11 @@ const getFilteredEmails = () => {
     if (fields.includes('attachments')) haystacks.push(email.attachments.join(' '));
 
     const combined = haystacks.join(' ').toLowerCase();
-    const queryOk = query ? combined.includes(query) : true;
-    const keywordsOk = keywords.length
-      ? keywords.every((term) => combined.includes(term))
-      : true;
-
-    return queryOk && keywordsOk;
+    if (!keywords.length) return combined.includes(query);
+    return keywords.every((term) => combined.includes(term));
   });
 };
 
-const updateRulesFromInputs = () => {
-  ruleInputs.forEach((input) => {
-    const key = input.dataset.rule;
-    if (!key) return;
-    const terms = input.value
-      .split(',')
-      .map((term) => term.trim())
-      .filter(Boolean);
-    state.rules[key] = terms.length ? terms : [];
-  });
-};
-
-const refreshClassifications = () => {
-  state.emails = state.emails.map((email) => ({
-    ...email,
-    category: classify(email.subject, email.body, email.attachments),
-  }));
-  renderList();
-  renderSummary(state.summaryId);
-};
 
 const handleFiles = async (fileListInput) => {
   const allFiles = Array.from(fileListInput);
@@ -897,13 +844,6 @@ const handleFiles = async (fileListInput) => {
   renderSummary(state.summaryId);
 };
 
-const setupRuleInputs = () => {
-  ruleInputs.forEach((input) => {
-    const key = input.dataset.rule;
-    if (!key) return;
-    input.value = state.rules[key].join(', ');
-  });
-};
 
 emlInput.addEventListener('change', (event) => {
   handleFiles(event.target.files);
@@ -944,6 +884,17 @@ tabButtons.forEach((button) => {
   });
 });
 
+if (geminiRun) {
+  geminiRun.addEventListener('click', () => {
+    if (state.mode !== 'gemini') {
+      setMode('gemini');
+    } else {
+      refreshCategories();
+    }
+    persistSnapshots();
+  });
+}
+
 langButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const nextLang = button.dataset.lang;
@@ -954,19 +905,7 @@ langButtons.forEach((button) => {
   });
 });
 
-categoryFilter.addEventListener('change', () => {
-  state.page = 1;
-  renderList();
-});
 searchInput.addEventListener('input', () => {
-  state.page = 1;
-  renderList();
-});
-searchInputRules.addEventListener('input', () => {
-  state.page = 1;
-  renderList();
-});
-keywordInput.addEventListener('input', () => {
   state.page = 1;
   renderList();
 });
@@ -977,16 +916,5 @@ fieldCheckboxes.forEach((checkbox) => {
   });
 });
 
-ruleInputs.forEach((input) => {
-  input.addEventListener('input', () => {
-    updateRulesFromInputs();
-    refreshClassifications();
-    state.page = 1;
-    renderList();
-    persistSnapshots();
-  });
-});
-
-setupRuleInputs();
 setMode(state.mode);
 applyTranslations();

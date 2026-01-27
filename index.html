@@ -56,15 +56,12 @@
       </div>
       <div class="tab-group" role="tablist" aria-label="Filter modes">
         <button type="button" class="tab-button is-active" data-tab="search" role="tab" aria-selected="true" data-i18n="tabSearch">검색 엔진</button>
-        <button type="button" class="tab-button" data-tab="rules" role="tab" aria-selected="false" data-i18n="tabRules">분류 규칙</button>
+        <button type="button" class="tab-button" data-tab="gemini" role="tab" aria-selected="false" data-i18n="tabGemini">Gemini 분류</button>
       </div>
 
       <div class="filter-controls" data-panel="search">
-        <label class="filter-label" for="keywordInput" data-i18n="keywordLabel">키워드</label>
-        <input id="keywordInput" type="text" placeholder="키워드 여러 개는 쉼표로 구분" data-i18n-placeholder="keywordPlaceholder" />
-
         <label class="filter-label" for="searchInput" data-i18n="filterSearch">검색</label>
-        <input id="searchInput" type="text" placeholder="제목, 본문, 발신자, 첨부파일명" data-i18n-placeholder="filterPlaceholder" />
+        <input id="searchInput" type="text" placeholder="키워드(쉼표로 구분), 제목, 본문, 발신자, 첨부파일명" data-i18n-placeholder="filterPlaceholder" />
 
         <div class="filter-fields" role="group" aria-label="Filter fields">
           <label><input type="checkbox" class="field-checkbox" value="subject" checked /> <span data-i18n="fieldSubject">제목</span></label>
@@ -74,53 +71,11 @@
         </div>
       </div>
 
-      <div class="filter-controls" data-panel="rules" hidden>
-        <label class="filter-label" for="categoryFilter" data-i18n="filterCategory">카테고리</label>
-        <select id="categoryFilter">
-          <option value="all" data-i18n="filterAll">전체</option>
-          <option value="work" data-i18n="categoryWork">업무</option>
-          <option value="finance" data-i18n="categoryFinance">결제/영수증</option>
-          <option value="marketing" data-i18n="categoryMarketing">프로모션</option>
-          <option value="security" data-i18n="categorySecurity">보안/계정</option>
-          <option value="personal" data-i18n="categoryPersonal">개인</option>
-        </select>
-
-        <label class="filter-label" for="searchInputRules" data-i18n="filterSearch">검색</label>
-        <input id="searchInputRules" type="text" placeholder="제목, 본문, 발신자, 첨부파일명" data-i18n-placeholder="filterPlaceholder" />
-
-        <div class="filter-fields" role="group" aria-label="Filter fields">
-          <label><input type="checkbox" class="field-checkbox" value="subject" checked /> <span data-i18n="fieldSubject">제목</span></label>
-          <label><input type="checkbox" class="field-checkbox" value="body" checked /> <span data-i18n="fieldBody">본문</span></label>
-          <label><input type="checkbox" class="field-checkbox" value="from" checked /> <span data-i18n="fieldFrom">발신자</span></label>
-          <label><input type="checkbox" class="field-checkbox" value="attachments" checked /> <span data-i18n="fieldAttachments">첨부파일명</span></label>
-        </div>
-      </div>
-
-      <div class="rule-editor" data-panel="rules" hidden>
-        <h3 data-i18n="ruleTitle">키워드 규칙</h3>
-        <p class="rule-hint" data-i18n="ruleHint">쉼표로 키워드를 구분하세요. 수정하면 자동 분류가 갱신됩니다.</p>
-        <div class="rule-grid">
-          <label class="rule-item">
-            <span data-i18n="categoryWork">업무</span>
-            <input type="text" data-rule="work" />
-          </label>
-          <label class="rule-item">
-            <span data-i18n="categoryFinance">결제/영수증</span>
-            <input type="text" data-rule="finance" />
-          </label>
-          <label class="rule-item">
-            <span data-i18n="categoryMarketing">프로모션</span>
-            <input type="text" data-rule="marketing" />
-          </label>
-          <label class="rule-item">
-            <span data-i18n="categorySecurity">보안/계정</span>
-            <input type="text" data-rule="security" />
-          </label>
-          <label class="rule-item">
-            <span data-i18n="categoryPersonal">개인</span>
-            <input type="text" data-rule="personal" />
-          </label>
-        </div>
+      <div class="filter-controls" data-panel="gemini" hidden>
+        <label class="filter-label" for="geminiPrompt" data-i18n="geminiPrompt">분류 기준 설명</label>
+        <textarea id="geminiPrompt" rows="4" placeholder="예: 견적/도면/계약 관련 메일만 보고 싶어" data-i18n-placeholder="geminiPlaceholder"></textarea>
+        <button type="button" class="file-button" id="geminiRun" data-i18n="geminiRun">Gemini로 분류</button>
+        <p class="hint" data-i18n="geminiHint">Gemini CLI 연동은 로컬 설정이 필요합니다. 연결되면 자동 분류됩니다.</p>
       </div>
 
       <a class="file-button link-button" href="/eml.html" data-i18n="viewFiltered">필터 결과 보기</a>
