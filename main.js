@@ -70,6 +70,7 @@ const translations = {
     geminiRunning: 'Gemini 분류 중...',
     geminiSuccess: (count) => `Gemini 분류 완료: ${count}개 매칭`,
     geminiError: 'Gemini 서버에 연결할 수 없습니다.',
+    geminiSetup: 'Gemini CLI 인증이 필요합니다. 터미널에서 `gemini` 실행 후 인증을 완료하세요.',
     geminiStored: '이전에 실행한 Gemini 결과가 있습니다.',
     fieldSubject: '제목',
     fieldBody: '본문',
@@ -118,6 +119,7 @@ const translations = {
     geminiRunning: 'Running Gemini...',
     geminiSuccess: (count) => `Gemini matched ${count} emails.`,
     geminiError: 'Could not reach Gemini server.',
+    geminiSetup: 'Gemini CLI needs authentication. Run `gemini` in a terminal to finish setup.',
     geminiStored: 'Saved Gemini results are available.',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
@@ -465,8 +467,11 @@ const runGeminiClassification = async () => {
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error('Gemini server error');
     const data = await response.json();
+    if (!response.ok) {
+      const message = data?.error || 'Gemini server error';
+      throw new Error(message);
+    }
     const ids = Array.isArray(data.matches) ? data.matches : [];
     applyGeminiMatches(ids);
     const payload = {
@@ -482,7 +487,14 @@ const runGeminiClassification = async () => {
     setGeminiStatus(t.geminiSuccess(ids.length));
     persistSnapshots();
   } catch (error) {
-    setGeminiStatus(t.geminiError);
+    const message = String(error?.message || '');
+    if (message.includes('GEMINI_SETUP')) {
+      setGeminiStatus(t.geminiSetup);
+    } else if (message.includes('GEMINI_TIMEOUT')) {
+      setGeminiStatus(t.geminiSetup);
+    } else {
+      setGeminiStatus(t.geminiError);
+    }
   } finally {
     clearTimeout(timeout);
   }

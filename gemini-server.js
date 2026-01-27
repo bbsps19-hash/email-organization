@@ -55,11 +55,15 @@ const buildPrompt = (prompt, emails) => {
 
 const runGemini = (prompt, emails) =>
   new Promise((resolve, reject) => {
-    const args = ['--prompt', buildPrompt(prompt, emails)];
+    const args = ['--output-format', 'json', '--prompt', buildPrompt(prompt, emails)];
     const child = spawn('gemini', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';
     let stderr = '';
+    const killTimer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error('GEMINI_TIMEOUT'));
+    }, 15000);
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString('utf-8');
@@ -70,12 +74,19 @@ const runGemini = (prompt, emails) =>
     });
 
     child.on('error', (error) => {
+      clearTimeout(killTimer);
       reject(error);
     });
 
     child.on('close', (code) => {
+      clearTimeout(killTimer);
       if (code !== 0) {
-        reject(new Error(stderr || `Gemini exited with code ${code}`));
+        const msg = stderr || `Gemini exited with code ${code}`;
+        if (msg.toLowerCase().includes('auth') || msg.toLowerCase().includes('login')) {
+          reject(new Error('GEMINI_SETUP'));
+        } else {
+          reject(new Error(msg));
+        }
         return;
       }
       const parsed = parseJsonFromText(stdout.trim());
