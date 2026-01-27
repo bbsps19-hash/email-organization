@@ -223,6 +223,16 @@ const decodeMimeWords = (value) => {
   });
 };
 
+const decodeAttachmentName = (value) => {
+  if (!value) return '';
+  let decoded = decodeMimeWords(value).trim();
+  for (let i = 0; i < 2; i += 1) {
+    if (!/=\?[^?]+\?[bqBQ]\?/.test(decoded)) break;
+    decoded = decodeMimeWords(decoded).trim();
+  }
+  return decoded.replace(/\s{2,}/g, ' ');
+};
+
 const parseHeaderParams = (value) => {
   if (!value) return { mime: '', params: {} };
   const tokens = [];
@@ -574,7 +584,7 @@ const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
 
   if (isAttachment) {
     attachments.push({
-      name: filename || 'attachment',
+      name: decodeAttachmentName(filename || 'attachment'),
       type: mime || 'application/octet-stream',
       bytes: bodyBytes,
     });
@@ -623,7 +633,9 @@ const renderSummary = (id) => {
   metaFrom.textContent = email.from || '-';
   metaTo.textContent = email.to || '-';
   metaDate.textContent = email.date || '-';
-  metaAttachments.textContent = email.attachments.length ? email.attachments.join(', ') : '-';
+  metaAttachments.textContent = email.attachments.length
+    ? email.attachments.map(decodeAttachmentName).join(', ')
+    : '-';
   metaCategory.textContent = label;
   metaSnippet.textContent = email.snippet || '-';
   renderAttachmentList(email);
@@ -632,7 +644,10 @@ const renderSummary = (id) => {
 const renderAttachmentList = (email) => {
   const t = translations[state.lang];
   attachmentList.innerHTML = '';
-  const items = email.attachmentsData || [];
+  const items = (email.attachmentsData || []).map((item) => ({
+    ...item,
+    name: decodeAttachmentName(item.name),
+  }));
   if (!items.length) {
     attachmentEmpty.textContent = t.attachmentEmpty;
     attachmentList.hidden = true;
@@ -701,7 +716,7 @@ const parseEml = (buffer) => {
 
   if (!attachmentsData.length) {
     attachmentsData = extractAttachments(rawText).map((name) => ({
-      name,
+      name: decodeAttachmentName(name),
       type: 'application/octet-stream',
       bytes: null,
     }));
@@ -710,7 +725,7 @@ const parseEml = (buffer) => {
   const preferred = texts.find((part) => part.mime === 'text/plain') || texts[0];
   const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
-  const attachments = attachmentsData.map((item) => item.name);
+  const attachments = attachmentsData.map((item) => decodeAttachmentName(item.name));
   const category = classify(subject, body, attachments);
 
   return { subject, from, to, date, body, snippet, attachments, attachmentsData, category };
