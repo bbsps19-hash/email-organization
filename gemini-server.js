@@ -42,8 +42,11 @@ const buildPrompt = (prompt, emails) => {
 
   return [
     'You are a classification assistant.',
+    '당신은 이메일 분류 도우미입니다.',
     `Task: Select email ids that match this criteria: "${prompt}".`,
+    `기준: "${prompt}" 에 해당하는 이메일 id만 선택하세요.`,
     'Return only JSON with this shape: {"matches":["id1","id2"],"notes":"optional"}',
+    'JSON만 출력하고 다른 설명/마크다운은 포함하지 마세요.',
     'Use only the provided email data. No extra commentary.',
     'Emails:',
     JSON.stringify(payload),

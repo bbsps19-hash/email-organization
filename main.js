@@ -70,6 +70,7 @@ const translations = {
     geminiRunning: 'Gemini 분류 중...',
     geminiSuccess: (count) => `Gemini 분류 완료: ${count}개 매칭`,
     geminiError: 'Gemini 서버에 연결할 수 없습니다.',
+    geminiStored: '이전에 실행한 Gemini 결과가 있습니다.',
     fieldSubject: '제목',
     fieldBody: '본문',
     fieldFrom: '발신자',
@@ -117,6 +118,7 @@ const translations = {
     geminiRunning: 'Running Gemini...',
     geminiSuccess: (count) => `Gemini matched ${count} emails.`,
     geminiError: 'Could not reach Gemini server.',
+    geminiStored: 'Saved Gemini results are available.',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
     fieldFrom: 'Sender',
@@ -394,11 +396,34 @@ const applyTranslations = () => {
 
   renderList();
   renderSummary(state.summaryId);
+  try {
+    localStorage.setItem('emailOrganizerLang', state.lang);
+  } catch (error) {
+    // Ignore storage errors.
+  }
 };
 
 const setGeminiStatus = (message) => {
   if (!geminiStatus) return;
   geminiStatus.textContent = message || '';
+};
+
+const setGeminiStatusFromStorage = () => {
+  if (!geminiStatus) return;
+  const t = translations[state.lang];
+  try {
+    const raw = localStorage.getItem('emailOrganizerGemini');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || !Array.isArray(data.matches)) return;
+    const time = data.updatedAt ? new Date(data.updatedAt) : null;
+    const timestamp = time ? time.toLocaleString(state.lang === 'ko' ? 'ko-KR' : 'en-US') : '';
+    const message = t.geminiSuccess(data.matches.length);
+    const base = timestamp ? `${message} (${timestamp})` : message;
+    geminiStatus.textContent = `${base} · ${t.geminiStored}`;
+  } catch (error) {
+    // Ignore storage errors.
+  }
 };
 
 const applyGeminiMatches = (ids) => {
@@ -444,6 +469,16 @@ const runGeminiClassification = async () => {
     const data = await response.json();
     const ids = Array.isArray(data.matches) ? data.matches : [];
     applyGeminiMatches(ids);
+    const payload = {
+      prompt: geminiPrompt?.value || '',
+      matches: ids,
+      updatedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem('emailOrganizerGemini', JSON.stringify(payload));
+    } catch (error) {
+      // Ignore storage errors.
+    }
     setGeminiStatus(t.geminiSuccess(ids.length));
     persistSnapshots();
   } catch (error) {
@@ -982,3 +1017,4 @@ fieldCheckboxes.forEach((checkbox) => {
 
 setMode(state.mode);
 applyTranslations();
+setGeminiStatusFromStorage();

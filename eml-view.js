@@ -3,13 +3,33 @@ const emptyView = document.getElementById('emptyView');
 const filterInfo = document.getElementById('filterInfo');
 const pagination = document.getElementById('emlPagination');
 
+const lang = localStorage.getItem('emailOrganizerLang') || 'ko';
+const t = {
+  ko: {
+    empty: '표시할 메일이 없습니다.',
+    modeSearch: '모드: 검색',
+    modeGemini: '모드: Gemini',
+    criteria: '기준',
+    query: '검색어',
+    defaultInfo: '현재 필터 조건에 해당하는 .eml 목록입니다.',
+  },
+  en: {
+    empty: 'No emails to display.',
+    modeSearch: 'Mode: Search',
+    modeGemini: 'Mode: Gemini',
+    criteria: 'Criteria',
+    query: 'Query',
+    defaultInfo: 'Showing .eml emails matching the current filter.',
+  },
+};
+
 const state = {
   page: 1,
   pageSize: 100,
 };
 
 const categoryLabels = {
-  uncategorized: '미분류',
+  uncategorized: lang === 'ko' ? '미분류' : 'Uncategorized',
   gemini: 'Gemini',
 };
 
@@ -20,6 +40,7 @@ const renderList = (emails) => {
   const start = (state.page - 1) * state.pageSize;
   const paged = emails.slice(start, start + state.pageSize);
   if (!emails.length) {
+    emptyView.textContent = t[lang].empty;
     emptyView.hidden = false;
     list.hidden = true;
     pagination.hidden = true;
@@ -94,17 +115,19 @@ const { emails, filters } = loadData();
 if (filters) {
   const parts = [];
   if (filters.mode === 'gemini') {
-    parts.push('모드: Gemini');
+    parts.push(t[lang].modeGemini);
     if (filters.geminiPrompt) {
-      parts.push(`기준: ${filters.geminiPrompt}`);
+      parts.push(`${t[lang].criteria}: ${filters.geminiPrompt}`);
     }
   } else {
-    parts.push('모드: 검색');
+    parts.push(t[lang].modeSearch);
     if (filters.query) {
-      parts.push(`검색어: ${filters.query}`);
+      parts.push(`${t[lang].query}: ${filters.query}`);
     }
   }
-  filterInfo.textContent = parts.length ? `현재 필터: ${parts.join(' / ')}` : '현재 필터 조건에 해당하는 .eml 목록입니다.';
+  filterInfo.textContent = parts.length ? `${parts.join(' / ')}` : t[lang].defaultInfo;
+} else {
+  filterInfo.textContent = t[lang].defaultInfo;
 }
 
 renderList(emails);
