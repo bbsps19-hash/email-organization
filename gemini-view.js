@@ -14,6 +14,7 @@ const t = {
     fallbackAssistant: '요청하신 기준으로 메일을 분류해드리겠습니다.',
     running: 'Gemini 분류 중...',
     error: 'Gemini 분류에 실패했습니다.',
+    connectError: '로컬 Gemini 서버에 연결할 수 없습니다. 터미널에서 gemini-server.js를 실행하세요.',
   },
   en: {
     empty: 'No emails to display.',
@@ -22,6 +23,7 @@ const t = {
     fallbackAssistant: 'I will classify emails based on your criteria.',
     running: 'Running Gemini...',
     error: 'Gemini classification failed.',
+    connectError: 'Cannot reach local Gemini server. Start gemini-server.js in your terminal.',
   },
 };
 
@@ -194,7 +196,12 @@ if (shouldRunGemini) {
       sessionStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
       renderAll(payload);
     })
-    .catch(() => {
-      assistantBubble.textContent = t[lang].error;
+    .catch((error) => {
+      const message = String(error?.message || '');
+      if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
+        assistantBubble.textContent = t[lang].connectError;
+      } else {
+        assistantBubble.textContent = t[lang].error;
+      }
     });
 }
