@@ -197,14 +197,20 @@ const decodeQpToBytes = (input) => {
   return new Uint8Array(bytes);
 };
 
+const normalizeEncodedWordSeparators = (value) =>
+  value.replace(/(\?=)\s*,\s*(=\?)/g, '$1 $2');
+
 const decodeMimeWords = (value) => {
   if (!value) return '';
-  return value.replace(/=\?([^?]+)\?([bqBQ])\?([^?]+)\?=/g, (match, charset, enc, text) => {
+  const normalized = normalizeEncodedWordSeparators(value);
+  return normalized.replace(/=\?([^?]+)\?([bqBQ])\?([^?]+)\?=/g, (match, charset, enc, text) => {
     const encoding = enc.toLowerCase();
     let bytes;
     if (encoding === 'b') {
       try {
-        const binary = atob(text.replace(/\s+/g, ''));
+        const sanitized = text.replace(/\s+/g, '');
+        const padding = '='.repeat((4 - (sanitized.length % 4)) % 4);
+        const binary = atob(sanitized + padding);
         bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
       } catch (error) {
         return match;
