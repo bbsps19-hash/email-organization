@@ -4,7 +4,6 @@ const pagination = document.getElementById('geminiPagination');
 const summary = document.getElementById('geminiSummary');
 const userBubble = document.getElementById('geminiUser');
 const assistantBubble = document.getElementById('geminiAssistant');
-const summary = document.getElementById('geminiSummary');
 
 const lang = localStorage.getItem('emailOrganizerLang') || 'ko';
 const t = {
