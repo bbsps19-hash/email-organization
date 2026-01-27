@@ -15,6 +15,8 @@ const pagination = document.getElementById('pagination');
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('[data-panel]');
 
+const GEMINI_STORAGE_KEY = 'emailOrganizerGeminiPayload';
+
 const metaSubject = document.getElementById('metaSubject');
 const metaFrom = document.getElementById('metaFrom');
 const metaTo = document.getElementById('metaTo');
@@ -78,6 +80,7 @@ const translations = {
     geminiDefaultReply: '요청하신 기준으로 메일을 분류해드리겠습니다.',
     geminiResponseLabel: 'Gemini 답변',
     geminiKeywordsLabel: 'Gemini 키워드',
+    geminiRuleRequired: '분류 기준을 입력하세요.',
     fieldSubject: '제목',
     fieldBody: '본문',
     fieldFrom: '발신자',
@@ -130,6 +133,7 @@ const translations = {
     geminiDefaultReply: 'I will classify emails based on your criteria.',
     geminiResponseLabel: 'Gemini Response',
     geminiKeywordsLabel: 'Gemini Keywords',
+    geminiRuleRequired: 'Please enter a classification rule.',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
     fieldFrom: 'Sender',
@@ -399,6 +403,9 @@ const applyTranslations = () => {
   if (resultButton) {
     resultButton.textContent = t.resultButton;
   }
+  if (resultButton) {
+    resultButton.disabled = state.mode === 'gemini' && !state.geminiRule.trim();
+  }
   if (geminiResponseText) {
     geminiResponseText.textContent = t.geminiDefaultReply;
   }
@@ -454,7 +461,7 @@ const setGeminiStatusFromStorage = () => {
   if (!status) return;
   const t = translations[state.lang];
   try {
-    const raw = localStorage.getItem('emailOrganizerGemini');
+    const raw = localStorage.getItem(GEMINI_STORAGE_KEY) || sessionStorage.getItem(GEMINI_STORAGE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
     if (!data || !Array.isArray(data.matches)) return;
@@ -501,6 +508,9 @@ const renderFilterPanel = () => {
       textarea.value = state.geminiRule;
       textarea.addEventListener('input', () => {
         state.geminiRule = textarea.value;
+        if (resultButton) {
+          resultButton.disabled = !state.geminiRule.trim();
+        }
       });
     }
     setGeminiStatusFromStorage();
@@ -522,7 +532,8 @@ const applyGeminiMatches = (ids) => {
 const runGeminiClassification = async () => {
   const t = translations[state.lang];
   if (!state.geminiRule.trim()) {
-    setGeminiStatus(t.geminiPlaceholder);
+    setGeminiStatus(t.geminiRuleRequired);
+    if (resultButton) resultButton.disabled = true;
     return;
   }
   setGeminiStatus(t.geminiRunning);
@@ -533,10 +544,11 @@ const runGeminiClassification = async () => {
       matches: [],
       keywords: [],
       reply: t.geminiDefaultReply,
+      results: [],
       updatedAt: Date.now(),
     });
-    localStorage.setItem('emailOrganizerGemini', seed);
-    sessionStorage.setItem('emailOrganizerGemini', seed);
+    localStorage.setItem(GEMINI_STORAGE_KEY, seed);
+    sessionStorage.setItem(GEMINI_STORAGE_KEY, seed);
   } catch (error) {
     // Ignore storage errors.
   }
@@ -555,6 +567,7 @@ const runGeminiClassification = async () => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
+    console.log('[gemini] request', payload);
     const response = await fetch('http://localhost:8787/classify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -566,21 +579,36 @@ const runGeminiClassification = async () => {
       const message = data?.error || 'Gemini server error';
       throw new Error(message);
     }
+    console.log('[gemini] rule', state.geminiRule.trim());
+    console.log('[gemini] response', data);
     const ids = Array.isArray(data.matches) ? data.matches : [];
     const keywords = Array.isArray(data.keywords) ? data.keywords : [];
     applyGeminiMatches(ids);
     const reply = data.reply || data.notes || t.geminiDefaultReply;
+    const resultEmails = state.emails
+      .filter((email) => ids.includes(email.id))
+      .map((email) => ({
+        id: email.id,
+        fileName: email.fileName,
+        subject: email.subject,
+        from: email.from,
+        date: email.date,
+        snippet: email.snippet,
+        attachments: email.attachments,
+        category: email.category,
+      }));
     const payload = {
       prompt: state.geminiRule || '',
       matches: ids,
       keywords,
       reply,
+      results: resultEmails,
       updatedAt: Date.now(),
     };
     try {
       const packed = JSON.stringify(payload);
-      localStorage.setItem('emailOrganizerGemini', packed);
-      sessionStorage.setItem('emailOrganizerGemini', packed);
+      localStorage.setItem(GEMINI_STORAGE_KEY, packed);
+      sessionStorage.setItem(GEMINI_STORAGE_KEY, packed);
     } catch (error) {
       // Ignore storage errors.
     }
@@ -1145,9 +1173,9 @@ langButtons.forEach((button) => {
   });
 });
 
-if (resultButton) {
-  resultButton.addEventListener('click', () => {
-    if (state.mode === 'gemini') {
+  if (resultButton) {
+    resultButton.addEventListener('click', () => {
+      if (state.mode === 'gemini') {
       runGeminiClassification().then(() => {
         persistSnapshots();
         window.location.href = '/gemini.html';
