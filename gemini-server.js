@@ -57,7 +57,7 @@ const buildPrompt = (prompt, emails) => {
 
 const runGemini = (prompt, emails) =>
   new Promise((resolve, reject) => {
-    const args = ['--output-format', 'json', '--prompt', buildPrompt(prompt, emails)];
+    const args = ['--output-format', 'json', buildPrompt(prompt, emails)];
     const child = spawn('gemini', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';
