@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>필터된 이메일</title>
+  <link href="/style.css" rel="stylesheet" />
+</head>
+<body>
+  <main class="page eml-view">
+    <header class="hero">
+      <div class="hero-top">
+        <p class="eyebrow">Email Toolkit</p>
+        <a class="file-button link-button" href="/index.html">메인으로</a>
+      </div>
+      <h1>필터된 이메일</h1>
+      <p class="subtitle" id="filterInfo">현재 필터 조건에 해당하는 .eml 목록입니다.</p>
+    </header>
+
+    <section class="upload-card">
+      <div class="file-list">
+        <p class="file-empty" id="emptyView">표시할 메일이 없습니다.</p>
+        <ul id="emlList" hidden></ul>
+      </div>
+    </section>
+  </main>
+
+  <script defer src="/eml-view.js"></script>
+</body>
+</html>

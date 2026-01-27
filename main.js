@@ -17,6 +17,8 @@ const metaDate = document.getElementById('metaDate');
 const metaAttachments = document.getElementById('metaAttachments');
 const metaCategory = document.getElementById('metaCategory');
 const metaSnippet = document.getElementById('metaSnippet');
+const attachmentList = document.getElementById('attachmentList');
+const attachmentEmpty = document.getElementById('attachmentEmpty');
 
 const state = {
   lang: 'ko',
@@ -54,6 +56,7 @@ const translations = {
     metaAttachments: '첨부파일',
     summaryCategory: '자동 분류',
     summarySnippet: '본문 미리보기',
+    summaryAttachments: '첨부파일 다운로드',
     filterTitle: '필터 & 분류 규칙',
     filterHint: '분류 기준을 수정하고, 조건에 맞는 메일만 확인하세요.',
     filterCategory: '카테고리',
@@ -66,6 +69,7 @@ const translations = {
     fieldAttachments: '첨부파일명',
     ruleTitle: '키워드 규칙',
     ruleHint: '쉼표로 키워드를 구분하세요. 수정하면 자동 분류가 갱신됩니다.',
+    viewFiltered: '필터 결과 보기',
     categoryWork: '업무',
     categoryFinance: '결제/영수증',
     categoryMarketing: '프로모션',
@@ -74,6 +78,9 @@ const translations = {
     dropAria: '.eml 파일을 여기로 드롭하세요',
     warningInvalid: (count) => `.eml이 아닌 파일 ${count}개는 제외되었습니다.`,
     warningNone: '선택한 파일 중 .eml 형식이 없습니다.',
+    attachmentEmpty: '첨부파일이 없습니다.',
+    attachmentDownload: '다운로드',
+    attachmentUnavailable: '다운로드 불가',
   },
   en: {
     title: 'Email Organizer',
@@ -96,6 +103,7 @@ const translations = {
     metaAttachments: 'Attachments',
     summaryCategory: 'Auto Category',
     summarySnippet: 'Body Preview',
+    summaryAttachments: 'Attachments',
     filterTitle: 'Filters & Rules',
     filterHint: 'Edit classification rules and show only matching emails.',
     filterCategory: 'Category',
@@ -108,6 +116,7 @@ const translations = {
     fieldAttachments: 'Attachments',
     ruleTitle: 'Keyword Rules',
     ruleHint: 'Separate keywords with commas. Updates classification automatically.',
+    viewFiltered: 'View filtered emails',
     categoryWork: 'Work',
     categoryFinance: 'Payments/Receipts',
     categoryMarketing: 'Promotion',
@@ -116,6 +125,9 @@ const translations = {
     dropAria: 'Drop .eml files here',
     warningInvalid: (count) => `Excluded ${count} non-.eml file(s).`,
     warningNone: 'No valid .eml files were selected.',
+    attachmentEmpty: 'No attachments.',
+    attachmentDownload: 'Download',
+    attachmentUnavailable: 'Unavailable',
   },
 };
 
@@ -207,7 +219,26 @@ const decodeMimeWords = (value) => {
 
 const parseHeaderParams = (value) => {
   if (!value) return { mime: '', params: {} };
-  const [mime, ...rest] = value.split(';');
+  const tokens = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      current += ch;
+      continue;
+    }
+    if (ch === ';' && !inQuotes) {
+      tokens.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current) tokens.push(current);
+
+  const [mimeToken, ...rest] = tokens;
   const params = {};
   rest.forEach((part) => {
     const [key, ...valParts] = part.split('=');
@@ -216,7 +247,40 @@ const parseHeaderParams = (value) => {
     if (!rawValue) return;
     params[key.trim().toLowerCase()] = rawValue.replace(/(^\"|\"$)/g, '');
   });
-  return { mime: mime.trim().toLowerCase(), params };
+
+  const expanded = { ...params };
+  const continuations = {};
+  Object.entries(params).forEach(([key, rawValue]) => {
+    const match = key.match(/^(.*)\*(\d+)(\*)?$/);
+    if (!match) return;
+    const base = match[1];
+    const idx = Number(match[2]);
+    const encoded = Boolean(match[3]);
+    if (!continuations[base]) continuations[base] = [];
+    continuations[base].push({ idx, value: rawValue, encoded });
+  });
+
+  Object.entries(continuations).forEach(([base, segments]) => {
+    segments.sort((a, b) => a.idx - b.idx);
+    let charset = null;
+    const bytes = [];
+    segments.forEach((segment, index) => {
+      let part = segment.value;
+      if (segment.encoded && index === 0 && part.includes("''")) {
+        const [cs, restPart] = part.split("''");
+        charset = normalizeCharset(cs);
+        part = restPart;
+      }
+      if (segment.encoded) {
+        bytes.push(...percentToBytes(part));
+      } else {
+        bytes.push(...latin1ToBytes(part));
+      }
+    });
+    expanded[base] = decodeBytes(Uint8Array.from(bytes), charset || 'utf-8');
+  });
+
+  return { mime: (mimeToken || '').trim().toLowerCase(), params: expanded };
 };
 
 const latin1FromBuffer = (buffer) =>
@@ -224,23 +288,35 @@ const latin1FromBuffer = (buffer) =>
 
 const latin1ToBytes = (text) => Uint8Array.from(text, (ch) => ch.charCodeAt(0));
 
-const decodeBodyWithEncoding = (bodyText, transferEncoding, charset) => {
+const percentToBytes = (value) => {
+  const bytes = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (ch === '%' && /[0-9A-Fa-f]{2}/.test(value.slice(i + 1, i + 3))) {
+      bytes.push(parseInt(value.slice(i + 1, i + 3), 16));
+      i += 2;
+    } else {
+      bytes.push(ch.charCodeAt(0));
+    }
+  }
+  return bytes;
+};
+
+const decodeBodyToBytes = (bodyText, transferEncoding) => {
   const encoding = (transferEncoding || '').toLowerCase();
-  let bytes;
   if (encoding === 'base64') {
     try {
       const sanitized = bodyText.replace(/\s+/g, '');
       const binary = atob(sanitized);
-      bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+      return Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
     } catch (error) {
-      bytes = latin1ToBytes(bodyText);
+      return latin1ToBytes(bodyText);
     }
-  } else if (encoding === 'quoted-printable') {
-    bytes = decodeQpToBytes(bodyText);
-  } else {
-    bytes = latin1ToBytes(bodyText);
   }
-  return decodeBytes(bytes, charset || 'utf-8');
+  if (encoding === 'quoted-printable') {
+    return decodeQpToBytes(bodyText);
+  }
+  return latin1ToBytes(bodyText);
 };
 
 const splitMultipart = (bodyText, boundary) => {
@@ -250,6 +326,13 @@ const splitMultipart = (bodyText, boundary) => {
   return parts
     .map((part) => part.replace(/^\r?\n/, '').replace(/\r?\n--\s*$/, '').trim())
     .filter(Boolean);
+};
+
+const looksLikeEml = (buffer) => {
+  const sample = latin1FromBuffer(buffer).slice(0, 65536);
+  const hasHeader = /^(from|subject|to|date|mime-version|content-type):/gim.test(sample);
+  const hasBlankLine = /\r?\n\r?\n/.test(sample);
+  return hasHeader && hasBlankLine;
 };
 
 const setWarning = (invalidCount, total) => {
@@ -300,6 +383,42 @@ const applyTranslations = () => {
   renderSummary(state.summaryId);
 };
 
+const persistSnapshots = () => {
+  try {
+    const serialize = (email) => ({
+      id: email.id,
+      fileName: email.fileName,
+      subject: email.subject,
+      from: email.from,
+      to: email.to,
+      date: email.date,
+      snippet: email.snippet,
+      category: email.category,
+      attachments: email.attachments,
+      size: email.size,
+    });
+    const filtered = getFilteredEmails();
+    localStorage.setItem(
+      'emailOrganizerSnapshot',
+      JSON.stringify({ updatedAt: Date.now(), emails: state.emails.map(serialize) })
+    );
+    localStorage.setItem(
+      'emailOrganizerFiltered',
+      JSON.stringify({
+        updatedAt: Date.now(),
+        emails: filtered.map(serialize),
+        filters: {
+          category: categoryFilter.value,
+          query: searchInput.value,
+          fields: getActiveFields(),
+        },
+      })
+    );
+  } catch (error) {
+    // Ignore storage errors (quota or privacy mode).
+  }
+};
+
 const renderList = () => {
   const filtered = getFilteredEmails();
   fileList.innerHTML = '';
@@ -308,6 +427,7 @@ const renderList = () => {
     emptyState.textContent = state.emails.length ? translations[state.lang].emptyFiltered : translations[state.lang].empty;
     emptyState.hidden = false;
     fileList.hidden = true;
+    persistSnapshots();
     return;
   }
 
@@ -344,6 +464,7 @@ const renderList = () => {
     });
     fileList.appendChild(li);
   });
+  persistSnapshots();
 };
 
 const parseHeaders = (rawHeaders) => {
@@ -377,9 +498,10 @@ const decodeRfc2231 = (value) => {
   if (!value) return '';
   const cleaned = value.replace(/(^\"|\"$)/g, '');
   if (!cleaned.includes("''")) return cleaned;
-  const [, encoded] = cleaned.split("''");
+  const [charset, encoded] = cleaned.split("''");
   try {
-    return decodeURIComponent(encoded);
+    const bytes = percentToBytes(encoded);
+    return decodeBytes(Uint8Array.from(bytes), normalizeCharset(charset));
   } catch (error) {
     return cleaned;
   }
@@ -390,7 +512,11 @@ const extractFilenameFromHeaders = (headers) => {
   const type = headers['content-type'] || '';
   const dispositionParams = parseHeaderParams(disposition).params;
   const typeParams = parseHeaderParams(type).params;
-  const raw = dispositionParams['filename*'] || dispositionParams.filename || typeParams['name*'] || typeParams.name;
+  const raw =
+    dispositionParams.filename ||
+    dispositionParams['filename*'] ||
+    typeParams.name ||
+    typeParams['name*'];
   if (!raw) return '';
   return decodeMimeWords(decodeRfc2231(raw)).trim();
 };
@@ -436,13 +562,20 @@ const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
 
   const filename = extractFilenameFromHeaders(headers);
   const disposition = (headers['content-disposition'] || '').toLowerCase();
+  const isAttachment = Boolean(filename) || disposition.includes('attachment');
+  const bodyBytes = decodeBodyToBytes(rawBody, transfer);
   const attachments = [];
-  if (filename || disposition.includes('attachment')) {
-    attachments.push(filename || 'attachment');
+
+  if (isAttachment) {
+    attachments.push({
+      name: filename || 'attachment',
+      type: mime || 'application/octet-stream',
+      bytes: bodyBytes,
+    });
   }
 
-  const decoded = decodeBodyWithEncoding(rawBody, transfer, charset);
   if (mime.startsWith('text/')) {
+    const decoded = decodeBytes(bodyBytes, charset);
     return { texts: [{ mime, text: decoded }], attachments };
   }
 
@@ -473,6 +606,9 @@ const renderSummary = (id) => {
     metaAttachments.textContent = '-';
     metaCategory.textContent = '-';
     metaSnippet.textContent = '-';
+    attachmentEmpty.textContent = '-';
+    attachmentList.hidden = true;
+    attachmentList.innerHTML = '';
     return;
   }
 
@@ -484,6 +620,49 @@ const renderSummary = (id) => {
   metaAttachments.textContent = email.attachments.length ? email.attachments.join(', ') : '-';
   metaCategory.textContent = label;
   metaSnippet.textContent = email.snippet || '-';
+  renderAttachmentList(email);
+};
+
+const renderAttachmentList = (email) => {
+  const t = translations[state.lang];
+  attachmentList.innerHTML = '';
+  const items = email.attachmentsData || [];
+  if (!items.length) {
+    attachmentEmpty.textContent = t.attachmentEmpty;
+    attachmentList.hidden = true;
+    return;
+  }
+
+  attachmentEmpty.textContent = '';
+  attachmentList.hidden = false;
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'attachment-item';
+    const name = document.createElement('span');
+    name.textContent = item.name;
+    const button = document.createElement('button');
+    if (item.bytes && item.bytes.length) {
+      button.textContent = t.attachmentDownload;
+      button.addEventListener('click', () => downloadAttachment(item));
+    } else {
+      button.textContent = t.attachmentUnavailable;
+      button.disabled = true;
+    }
+    li.append(name, button);
+    attachmentList.appendChild(li);
+  });
+};
+
+const downloadAttachment = (item) => {
+  const blob = new Blob([item.bytes], { type: item.type || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = item.name || 'attachment';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 };
 
 const parseEml = (buffer) => {
@@ -497,32 +676,38 @@ const parseEml = (buffer) => {
 
   const { mime, params } = parseHeaderParams(headers['content-type'] || 'text/plain');
   let texts = [];
-  let attachments = [];
+  let attachmentsData = [];
   if (mime.startsWith('multipart/')) {
     const boundary = params.boundary;
     const parts = splitMultipart(rawBody, boundary);
     parts.forEach((part) => {
       const parsed = parsePart(part, params.charset || 'utf-8');
       texts = texts.concat(parsed.texts);
-      attachments = attachments.concat(parsed.attachments);
+      attachmentsData = attachmentsData.concat(parsed.attachments);
     });
   } else {
     const transfer = headers['content-transfer-encoding'] || '';
     const charset = params.charset || 'utf-8';
-    const decoded = decodeBodyWithEncoding(rawBody, transfer, charset);
+    const bodyBytes = decodeBodyToBytes(rawBody, transfer);
+    const decoded = decodeBytes(bodyBytes, charset);
     texts = [{ mime: mime || 'text/plain', text: decoded }];
   }
 
-  if (!attachments.length) {
-    attachments = extractAttachments(rawText);
+  if (!attachmentsData.length) {
+    attachmentsData = extractAttachments(rawText).map((name) => ({
+      name,
+      type: 'application/octet-stream',
+      bytes: null,
+    }));
   }
 
   const preferred = texts.find((part) => part.mime === 'text/plain') || texts[0];
   const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
+  const attachments = attachmentsData.map((item) => item.name);
   const category = classify(subject, body, attachments);
 
-  return { subject, from, to, date, body, snippet, attachments, category };
+  return { subject, from, to, date, body, snippet, attachments, attachmentsData, category };
 };
 
 const getActiveFields = () =>
@@ -575,31 +760,39 @@ const refreshClassifications = () => {
 
 const handleFiles = async (fileListInput) => {
   const allFiles = Array.from(fileListInput);
-  const validFiles = allFiles.filter(isEmlFile).slice(0, 10);
-  const invalidCount = allFiles.length - validFiles.length;
+  const limitedFiles = allFiles.slice(0, 10);
+  const parsed = [];
+  let invalidCount = 0;
+
+  for (const file of limitedFiles) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const valid = isEmlFile(file) || looksLikeEml(buffer);
+      if (!valid) {
+        invalidCount += 1;
+        continue;
+      }
+      const data = parseEml(buffer);
+      parsed.push({
+        id: crypto.randomUUID(),
+        fileName: file.name,
+        size: file.size,
+        ...data,
+      });
+    } catch (error) {
+      invalidCount += 1;
+    }
+  }
 
   setWarning(invalidCount, allFiles.length);
 
-  if (!validFiles.length) {
+  if (!parsed.length) {
     state.emails = [];
     state.summaryId = null;
     renderList();
     renderSummary(null);
     return;
   }
-
-  const parsed = await Promise.all(
-    validFiles.map(async (file) => {
-      const buffer = await file.arrayBuffer();
-      const data = parseEml(buffer);
-      return {
-        id: crypto.randomUUID(),
-        fileName: file.name,
-        size: file.size,
-        ...data,
-      };
-    })
-  );
 
   state.emails = parsed;
   state.summaryId = parsed[parsed.length - 1]?.id ?? null;
