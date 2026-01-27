@@ -625,11 +625,14 @@ const renderList = () => {
   emptyState.hidden = true;
   fileList.hidden = false;
 
-  paged.forEach((email) => {
+  paged.forEach((email, index) => {
     const li = document.createElement('li');
     li.dataset.id = email.id;
     if (email.id === state.summaryId) {
       li.classList.add('is-active');
+    }
+    if (index >= 5) {
+      li.classList.add('is-hidden');
     }
 
     const title = document.createElement('strong');
@@ -655,6 +658,19 @@ const renderList = () => {
     });
     fileList.appendChild(li);
   });
+
+  if (paged.length > 5) {
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'page-tab';
+    toggle.textContent = '더 보기';
+    toggle.addEventListener('click', () => {
+      const hidden = fileList.querySelectorAll('li.is-hidden');
+      hidden.forEach((item) => item.classList.remove('is-hidden'));
+      toggle.remove();
+    });
+    fileList.appendChild(toggle);
+  }
   renderPagination(totalPages);
   persistSnapshots();
 };
@@ -1006,6 +1022,7 @@ const handleFiles = async (fileListInput) => {
 
 emlInput.addEventListener('change', (event) => {
   handleFiles(event.target.files);
+  event.target.value = '';
 });
 
 dropZone.addEventListener('click', () => emlInput.click());
