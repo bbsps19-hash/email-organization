@@ -1301,7 +1301,7 @@ const classify = (subject, body, attachments) => {
 };
 
 const renderSummary = (id) => {
-  const email = state.emails.find((item) => item.id === id);
+  let email = state.emails.find((item) => item.id === id);
   if (!email) {
     metaSubject.textContent = '-';
     metaFrom.textContent = '-';
@@ -1316,6 +1316,39 @@ const renderSummary = (id) => {
     return;
   }
 
+  if (email?.rawText && Array.isArray(email.attachmentsData) && email.attachmentsData.length) {
+    const encodedNames = extractEncodedWordFilenames(email.rawText);
+    const rawNames = extractHeaderFilenamesFromRaw(email.rawText);
+    const combinedNames = Array.from(new Set([...rawNames, ...encodedNames]));
+    if (combinedNames.length) {
+      const rankedNames = [...combinedNames].sort((a, b) => {
+        const scoreA = scoreDecodedText(a);
+        const scoreB = scoreDecodedText(b);
+        if (scoreA.replacements !== scoreB.replacements) {
+          return scoreA.replacements - scoreB.replacements;
+        }
+        if (scoreA.hangul !== scoreB.hangul) {
+          return scoreB.hangul - scoreA.hangul;
+        }
+        return b.length - a.length;
+      });
+      const bestName = rankedNames[0];
+      const repaired = email.attachmentsData.map((item, index) => {
+        if (typeof item.name !== 'string') return item;
+        const trimmed = item.name.trim();
+        const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
+        if (!looksBroken && trimmed.includes('.')) return item;
+        let match = combinedNames.find((name) => name.startsWith(trimmed));
+        if (!match && combinedNames.length === email.attachmentsData.length) {
+          match = combinedNames[index];
+        }
+        if (!match) match = bestName;
+        return match ? { ...item, name: match } : item;
+      });
+      const repairedAttachments = repaired.map((item) => decodeAttachmentName(item.name));
+      email = { ...email, attachmentsData: repaired, attachments: repairedAttachments };
+    }
+  }
   const label = categoryLabels[email.category]?.[state.lang] ?? '-';
   metaSubject.textContent = email.subject || '-';
   metaFrom.textContent = email.from || '-';
@@ -1413,10 +1446,11 @@ const parseEml = (buffer) => {
   const preferred = texts.find((part) => part.mime === 'text/plain') || texts[0];
   const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
-  const encodedNames = extractEncodedWordFilenames(rawText);
-  const rawNames = extractHeaderFilenamesFromRaw(rawText);
-  const combinedNames = Array.from(new Set([...rawNames, ...encodedNames]));
-  if (combinedNames.length) {
+  const applyRawNames = (emailAttachments) => {
+    const encodedNames = extractEncodedWordFilenames(rawText);
+    const rawNames = extractHeaderFilenamesFromRaw(rawText);
+    const combinedNames = Array.from(new Set([...rawNames, ...encodedNames]));
+    if (!combinedNames.length || !emailAttachments.length) return emailAttachments;
     const rankedNames = [...combinedNames].sort((a, b) => {
       const scoreA = scoreDecodedText(a);
       const scoreB = scoreDecodedText(b);
@@ -1429,13 +1463,13 @@ const parseEml = (buffer) => {
       return b.length - a.length;
     });
     const bestName = rankedNames[0];
-    attachmentsData = attachmentsData.map((item, index) => {
+    return emailAttachments.map((item, index) => {
       if (typeof item.name !== 'string') return item;
       const trimmed = item.name.trim();
       const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
       if (!looksBroken && trimmed.includes('.')) return item;
       let match = combinedNames.find((name) => name.startsWith(trimmed));
-      if (!match && combinedNames.length === attachmentsData.length) {
+      if (!match && combinedNames.length === emailAttachments.length) {
         match = combinedNames[index];
       }
       if (!match) {
@@ -1443,7 +1477,8 @@ const parseEml = (buffer) => {
       }
       return match ? { ...item, name: match } : item;
     });
-  }
+  };
+  attachmentsData = applyRawNames(attachmentsData);
   const attachments = attachmentsData.map((item) => decodeAttachmentName(item.name));
   const category = classify(subject, body, attachments);
   const hasTruncatedAttachment = attachmentsData.some(
