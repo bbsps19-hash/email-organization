@@ -301,6 +301,17 @@ const pickBestText = (candidates) => {
   return best;
 };
 
+const decodeAddressHeader = (value) => {
+  if (!value) return '';
+  const raw = String(value);
+  const decoded = decodeMimeWords(raw).replace(/\s{2,}/g, ' ').trim();
+  const repaired = repairMojibake(decoded);
+  const rawBytes = latin1ToBytes(raw);
+  const utf8FromLatin1 = decodeBytes(rawBytes, 'utf-8');
+  const eucFromLatin1 = decodeBytes(rawBytes, 'euc-kr');
+  return pickBestText([repaired, decoded, utf8FromLatin1, eucFromLatin1, raw]);
+};
+
 const pickBestDecoded = (bytes, charset) => {
   const normalized = normalizeCharset(charset);
   const candidates = [normalized, 'utf-8', 'euc-kr', 'windows-1252']
@@ -1326,7 +1337,7 @@ const extractFirstFilenameFromRaw = (rawText) => {
   const match = rawText.match(/filename=\"([\\s\\S]*?)\"/i);
   if (!match?.[1]) return '';
   const cleaned = match[1].replace(/\\r?\\n[ \\t]+/g, '');
-  return decodeMimeWords(cleaned);
+  return decodeAttachmentName(cleaned);
 };
 
 const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
@@ -1469,9 +1480,9 @@ const parseEml = (buffer) => {
   const rawText = latin1FromBuffer(buffer);
   const [rawHeaders = '', rawBody = ''] = rawText.split(/\r?\n\r?\n/);
   const headers = parseHeaders(rawHeaders);
-  const subject = headers.subject || '';
-  const from = headers.from || '';
-  const to = headers.to || '';
+  const subject = decodeAttachmentName(headers.subject || '');
+  const from = decodeAddressHeader(headers.from || '');
+  const to = decodeAddressHeader(headers.to || '');
   const date = headers.date || '';
 
   const { mime, params } = parseHeaderParams(headers['content-type'] || 'text/plain');
