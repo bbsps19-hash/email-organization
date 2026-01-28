@@ -1006,7 +1006,7 @@ const persistSnapshots = () => {
 const renderList = () => {
   const filtered = getFilteredEmails();
   fileList.innerHTML = '';
-  const pageSize = 100;
+  const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   if (state.page > totalPages) state.page = totalPages;
   const start = (state.page - 1) * pageSize;
@@ -1031,10 +1031,6 @@ const renderList = () => {
     if (email.id === state.summaryId) {
       li.classList.add('is-active');
     }
-    if (index >= 5) {
-      li.classList.add('is-hidden');
-    }
-
     const title = document.createElement('strong');
     title.textContent = email.subject || email.fileName;
 
@@ -1059,29 +1055,6 @@ const renderList = () => {
     fileList.appendChild(li);
   });
 
-  if (paged.length > 5) {
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'page-tab';
-    let expanded = false;
-    const renderToggle = () => {
-      toggle.textContent = state.lang === 'ko'
-        ? (expanded ? '접기' : '더 보기')
-        : (expanded ? 'Show less' : 'Show more');
-    };
-    renderToggle();
-    toggle.addEventListener('click', () => {
-      expanded = !expanded;
-      const items = fileList.querySelectorAll('li');
-      items.forEach((item, idx) => {
-        if (idx >= 5) {
-          item.classList.toggle('is-hidden', !expanded);
-        }
-      });
-      renderToggle();
-    });
-    fileList.appendChild(toggle);
-  }
   renderPagination(totalPages);
   persistSnapshots();
 };

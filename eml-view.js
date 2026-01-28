@@ -25,7 +25,7 @@ const t = {
 
 const state = {
   page: 1,
-  pageSize: 100,
+  pageSize: 20,
 };
 
 const categoryLabels = {
