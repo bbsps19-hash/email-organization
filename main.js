@@ -1034,12 +1034,13 @@ const extractFilenameFromHeaders = (headers) => {
 };
 
 const extractAttachments = (text) => {
+  const searchText = text.replace(/\r?\n[ \t]+/g, ' ');
   const names = new Set();
   const filenameRegex = /filename\\*?=\\??\"?([^\";\\r\\n]+)/gi;
   const nameRegex = /name\\*?=\\??\"?([^\";\\r\\n]+)/gi;
   const continuationRegex = /(filename|name)\\*(\\d+)\\*?=([^;\\r\\n]+)/gi;
   const continuationBuckets = { filename: new Map(), name: new Map() };
-  let contMatch = continuationRegex.exec(text);
+  let contMatch = continuationRegex.exec(searchText);
   while (contMatch) {
     const base = contMatch[1].toLowerCase();
     const idx = Number(contMatch[2]);
@@ -1048,7 +1049,7 @@ const extractAttachments = (text) => {
     if (!continuationBuckets[base].has(idx)) {
       continuationBuckets[base].set(idx, { idx, encoded, value: raw });
     }
-    contMatch = continuationRegex.exec(text);
+    contMatch = continuationRegex.exec(searchText);
   }
   ['filename', 'name'].forEach((base) => {
     if (!continuationBuckets[base].size) return;
@@ -1071,15 +1072,15 @@ const extractAttachments = (text) => {
     const combined = decodeBytes(Uint8Array.from(bytes), charset || 'utf-8');
     if (combined) names.add(decodeMimeWords(combined));
   });
-  let match = filenameRegex.exec(text);
+  let match = filenameRegex.exec(searchText);
   while (match) {
     names.add(decodeMimeWords(decodeRfc2231(match[1].trim())));
-    match = filenameRegex.exec(text);
+    match = filenameRegex.exec(searchText);
   }
-  match = nameRegex.exec(text);
+  match = nameRegex.exec(searchText);
   while (match) {
     names.add(decodeMimeWords(decodeRfc2231(match[1].trim())));
-    match = nameRegex.exec(text);
+    match = nameRegex.exec(searchText);
   }
   return Array.from(names).filter(Boolean);
 };
