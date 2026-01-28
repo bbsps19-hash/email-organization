@@ -1331,6 +1331,14 @@ const repairAttachmentData = (emailAttachments, rawText) => {
   });
 };
 
+const extractFirstFilenameFromRaw = (rawText) => {
+  if (!rawText) return '';
+  const match = rawText.match(/filename=\"([\\s\\S]*?)\"/i);
+  if (!match?.[1]) return '';
+  const cleaned = match[1].replace(/\\r?\\n[ \\t]+/g, '');
+  return decodeMimeWords(cleaned);
+};
+
 const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
   const [rawHeaders = '', rawBody = ''] = rawPart.split(/\r?\n\r?\n/);
   const headers = parseHeaders(rawHeaders);
@@ -1589,6 +1597,15 @@ const handleFiles = async (fileListInput) => {
       const repaired = repairAttachmentData(data.attachmentsData, data.rawText);
       data.attachmentsData = repaired;
       data.attachments = repaired.map((item) => decodeAttachmentName(item.name));
+      const forcedName = extractFirstFilenameFromRaw(data.rawText);
+      if (forcedName && data.attachmentsData.length === 1) {
+        const current = data.attachmentsData[0]?.name || '';
+        const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(current) || current.endsWith('-');
+        if (looksBroken || !current.includes('.')) {
+          data.attachmentsData = [{ ...data.attachmentsData[0], name: forcedName }];
+          data.attachments = [forcedName];
+        }
+      }
       parsed.push({
         id: crypto.randomUUID(),
         fileName: file.name,
