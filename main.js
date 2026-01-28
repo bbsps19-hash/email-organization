@@ -931,7 +931,13 @@ const parseHeaders = (rawHeaders) => {
     const idx = line.indexOf(':');
     if (idx === -1) return;
     const key = line.slice(0, idx).toLowerCase();
-    const value = decodeMimeWords(line.slice(idx + 1).trim());
+    const rawValue = line.slice(idx + 1).trim();
+    const shouldDecode =
+      key !== 'content-type' &&
+      key !== 'content-disposition' &&
+      key !== 'content-transfer-encoding' &&
+      key !== 'mime-version';
+    const value = shouldDecode ? decodeMimeWords(rawValue) : rawValue;
     headers[key] = headers[key] ? `${headers[key]}, ${value}` : value;
   });
   return headers;
