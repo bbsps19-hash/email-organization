@@ -1249,6 +1249,29 @@ const extractHeaderFilenamesFromRaw = (text) => {
   return Array.from(names).filter(Boolean);
 };
 
+const extractHeaderFilenameEntries = (text) => {
+  const entries = [];
+  const quoted = /(filename|name)\\*?=\\s*\"([\\s\\S]*?)\"/gi;
+  let match = quoted.exec(text);
+  while (match) {
+    const kind = match[1].toLowerCase();
+    const cleaned = match[2].replace(/\\r?\\n[ \\t]+/g, '');
+    const decoded = decodeHeaderParamValue(cleaned);
+    if (decoded) entries.push({ kind, value: decoded });
+    match = quoted.exec(text);
+  }
+  const searchText = text.replace(/\\r?\\n[ \\t]+/g, '');
+  const unquoted = /(filename|name)\\*?=\\s*([^;\\r\\n]+)/gi;
+  match = unquoted.exec(searchText);
+  while (match) {
+    const kind = match[1].toLowerCase();
+    const decoded = decodeHeaderParamValue(match[2].trim());
+    if (decoded) entries.push({ kind, value: decoded });
+    match = unquoted.exec(searchText);
+  }
+  return entries;
+};
+
 const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
   const [rawHeaders = '', rawBody = ''] = rawPart.split(/\r?\n\r?\n/);
   const headers = parseHeaders(rawHeaders);
@@ -1317,9 +1340,13 @@ const renderSummary = (id) => {
   }
 
   if (email?.rawText && Array.isArray(email.attachmentsData) && email.attachmentsData.length) {
+    const entries = extractHeaderFilenameEntries(email.rawText);
+    const filenameList = entries.filter((item) => item.kind === 'filename').map((item) => item.value);
+    const nameList = entries.filter((item) => item.kind === 'name').map((item) => item.value);
+    const orderedNames = filenameList.length ? filenameList : nameList;
     const encodedNames = extractEncodedWordFilenames(email.rawText);
     const rawNames = extractHeaderFilenamesFromRaw(email.rawText);
-    const combinedNames = Array.from(new Set([...rawNames, ...encodedNames]));
+    const combinedNames = Array.from(new Set([...orderedNames, ...rawNames, ...encodedNames]));
     if (combinedNames.length) {
       const rankedNames = [...combinedNames].sort((a, b) => {
         const scoreA = scoreDecodedText(a);
@@ -1339,7 +1366,9 @@ const renderSummary = (id) => {
         const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
         if (!looksBroken && trimmed.includes('.')) return item;
         let match = combinedNames.find((name) => name.startsWith(trimmed));
-        if (!match && combinedNames.length === email.attachmentsData.length) {
+        if (!match && orderedNames.length) {
+          match = orderedNames[Math.min(index, orderedNames.length - 1)];
+        } else if (!match && combinedNames.length === email.attachmentsData.length) {
           match = combinedNames[index];
         }
         if (!match) match = bestName;
@@ -1447,9 +1476,13 @@ const parseEml = (buffer) => {
   const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
   const applyRawNames = (emailAttachments) => {
+    const entries = extractHeaderFilenameEntries(rawText);
+    const filenameList = entries.filter((item) => item.kind === 'filename').map((item) => item.value);
+    const nameList = entries.filter((item) => item.kind === 'name').map((item) => item.value);
+    const orderedNames = filenameList.length ? filenameList : nameList;
     const encodedNames = extractEncodedWordFilenames(rawText);
     const rawNames = extractHeaderFilenamesFromRaw(rawText);
-    const combinedNames = Array.from(new Set([...rawNames, ...encodedNames]));
+    const combinedNames = Array.from(new Set([...orderedNames, ...rawNames, ...encodedNames]));
     if (!combinedNames.length || !emailAttachments.length) return emailAttachments;
     const rankedNames = [...combinedNames].sort((a, b) => {
       const scoreA = scoreDecodedText(a);
@@ -1469,7 +1502,9 @@ const parseEml = (buffer) => {
       const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
       if (!looksBroken && trimmed.includes('.')) return item;
       let match = combinedNames.find((name) => name.startsWith(trimmed));
-      if (!match && combinedNames.length === emailAttachments.length) {
+      if (!match && orderedNames.length) {
+        match = orderedNames[Math.min(index, orderedNames.length - 1)];
+      } else if (!match && combinedNames.length === emailAttachments.length) {
         match = combinedNames[index];
       }
       if (!match) {
