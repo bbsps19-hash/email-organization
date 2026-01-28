@@ -361,6 +361,21 @@ const decodeMimeWords = (value) => {
   return repairMojibake(cleaned);
 };
 
+const decodeMimeWordsTight = (value) => {
+  if (!value) return '';
+  const tokenRegex = /=\?[^?]+\?[bqBQ]\?[^?]+\?=/g;
+  const tokens = [];
+  value.replace(tokenRegex, (match) => {
+    tokens.push(decodeMimeWords(match));
+    return match;
+  });
+  const remainder = value.replace(tokenRegex, '').replace(/[\s"']/g, '');
+  if (tokens.length && !remainder) {
+    return tokens.join('');
+  }
+  return decodeMimeWords(value);
+};
+
 const decodeAttachmentName = (value) => {
   if (!value) return '';
   const raw = String(value);
@@ -381,7 +396,7 @@ const decodeHeaderParamValue = (rawValue) => {
   if (!rawValue) return '';
   const cleaned = rawValue.trim().replace(/(^\"|\"$)/g, '');
   const decodedRfc = decodeRfc2231(cleaned);
-  const decoded = decodeMimeWords(decodedRfc).trim();
+  const decoded = decodeMimeWordsTight(decodedRfc).trim();
   const repaired = repairMojibake(decoded);
   if (repaired && repaired !== decoded) return repaired;
   if (!/�/.test(decoded)) return decoded;
