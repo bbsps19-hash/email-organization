@@ -1406,6 +1406,10 @@ const parseEml = (buffer) => {
   const hasTruncatedAttachment = attachmentsData.some(
     (item) => typeof item.name === 'string' && item.name.trim().endsWith('-')
   );
+  const hasMojibakeAttachment = attachmentsData.some((item) => {
+    const name = typeof item.name === 'string' ? item.name : '';
+    return /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(name);
+  });
 
   return {
     subject,
@@ -1417,7 +1421,7 @@ const parseEml = (buffer) => {
     attachments,
     attachmentsData,
     category,
-    rawText: hasTruncatedAttachment ? rawText : null,
+    rawText: hasTruncatedAttachment || hasMojibakeAttachment ? rawText : null,
   };
 };
 
