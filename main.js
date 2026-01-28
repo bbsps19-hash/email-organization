@@ -280,6 +280,27 @@ const scoreDecodedText = (value) => {
   return { replacements, hangul };
 };
 
+const pickBestText = (candidates) => {
+  const filtered = candidates.map((value) => (value ? value.trim() : '')).filter(Boolean);
+  if (!filtered.length) return '';
+  let best = filtered[0];
+  let bestScore = scoreDecodedText(best);
+  for (let i = 1; i < filtered.length; i += 1) {
+    const score = scoreDecodedText(filtered[i]);
+    if (
+      score.replacements < bestScore.replacements ||
+      (score.replacements === bestScore.replacements && score.hangul > bestScore.hangul) ||
+      (score.replacements === bestScore.replacements &&
+        score.hangul === bestScore.hangul &&
+        filtered[i].length > best.length)
+    ) {
+      best = filtered[i];
+      bestScore = score;
+    }
+  }
+  return best;
+};
+
 const pickBestDecoded = (bytes, charset) => {
   const normalized = normalizeCharset(charset);
   const candidates = [normalized, 'utf-8', 'euc-kr', 'windows-1252']
@@ -328,13 +349,18 @@ const decodeMimeWords = (value) => {
 
 const decodeAttachmentName = (value) => {
   if (!value) return '';
-  let decoded = decodeMimeWords(value).trim();
+  const raw = String(value);
+  let decoded = decodeMimeWords(raw).trim();
   for (let i = 0; i < 2; i += 1) {
     if (!/=\?[^?]+\?[bqBQ]\?/.test(decoded)) break;
     decoded = decodeMimeWords(decoded).trim();
   }
   decoded = decoded.replace(/\s{2,}/g, ' ');
-  return repairMojibake(decoded);
+  const repaired = repairMojibake(decoded);
+  const rawBytes = latin1ToBytes(raw);
+  const utf8FromLatin1 = decodeBytes(rawBytes, 'utf-8');
+  const eucFromLatin1 = decodeBytes(rawBytes, 'euc-kr');
+  return pickBestText([repaired, decoded, utf8FromLatin1, eucFromLatin1, raw]);
 };
 
 const decodeHeaderParamValue = (rawValue) => {
