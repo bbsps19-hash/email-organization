@@ -1393,11 +1393,18 @@ const parseEml = (buffer) => {
   const snippet = body.slice(0, 200);
   const encodedNames = extractEncodedWordFilenames(rawText);
   if (encodedNames.length) {
-    attachmentsData = attachmentsData.map((item) => {
+    attachmentsData = attachmentsData.map((item, index) => {
       if (typeof item.name !== 'string') return item;
       const trimmed = item.name.trim();
-      if (!trimmed || (!trimmed.endsWith('-') && trimmed.includes('.'))) return item;
-      const match = encodedNames.find((name) => name.startsWith(trimmed));
+      const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
+      if (!looksBroken && trimmed.includes('.')) return item;
+      let match = encodedNames.find((name) => name.startsWith(trimmed));
+      if (!match && encodedNames.length === attachmentsData.length) {
+        match = encodedNames[index];
+      }
+      if (!match && encodedNames.length === 1) {
+        match = encodedNames[0];
+      }
       return match ? { ...item, name: match } : item;
     });
   }
