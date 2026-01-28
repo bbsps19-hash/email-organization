@@ -1285,14 +1285,14 @@ const repairAttachmentData = (emailAttachments, rawText) => {
     for (const match of filenameMatches) {
       if (!match?.[1]) continue;
       const cleaned = match[1].replace(/\r?\n[ \t]+/g, '');
-      const decoded = decodeHeaderParamValue(cleaned);
+      const decoded = decodeMimeWords(cleaned);
       if (decoded) decodedMatches.push(decoded);
     }
     const cdMatches = rawText.matchAll(/content-disposition:[\s\S]*?filename=\"([\s\S]*?)\"/gi);
     for (const match of cdMatches) {
       if (!match?.[1]) continue;
       const cleaned = match[1].replace(/\r?\n[ \t]+/g, '');
-      const decoded = decodeHeaderParamValue(cleaned);
+      const decoded = decodeMimeWords(cleaned);
       if (decoded) decodedMatches.push(decoded);
     }
     if (decodedMatches.length) orderedNames = decodedMatches;
