@@ -1228,6 +1228,27 @@ const extractEncodedWordFilenames = (text) => {
   return Array.from(names).filter(Boolean);
 };
 
+const extractHeaderFilenamesFromRaw = (text) => {
+  const names = new Set();
+  const quoted = /(?:filename|name)\*?=\\s*\"([\\s\\S]*?)\"/gi;
+  let match = quoted.exec(text);
+  while (match) {
+    const cleaned = match[1].replace(/\\r?\\n[ \\t]+/g, '');
+    const decoded = decodeHeaderParamValue(cleaned);
+    if (decoded) names.add(decoded);
+    match = quoted.exec(text);
+  }
+  const searchText = text.replace(/\\r?\\n[ \\t]+/g, '');
+  const unquoted = /(?:filename|name)\\*?=\\s*([^;\\r\\n]+)/gi;
+  match = unquoted.exec(searchText);
+  while (match) {
+    const decoded = decodeHeaderParamValue(match[1].trim());
+    if (decoded) names.add(decoded);
+    match = unquoted.exec(searchText);
+  }
+  return Array.from(names).filter(Boolean);
+};
+
 const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
   const [rawHeaders = '', rawBody = ''] = rawPart.split(/\r?\n\r?\n/);
   const headers = parseHeaders(rawHeaders);
@@ -1393,8 +1414,10 @@ const parseEml = (buffer) => {
   const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
   const encodedNames = extractEncodedWordFilenames(rawText);
-  if (encodedNames.length) {
-    const rankedNames = [...encodedNames].sort((a, b) => {
+  const rawNames = extractHeaderFilenamesFromRaw(rawText);
+  const combinedNames = Array.from(new Set([...rawNames, ...encodedNames]));
+  if (combinedNames.length) {
+    const rankedNames = [...combinedNames].sort((a, b) => {
       const scoreA = scoreDecodedText(a);
       const scoreB = scoreDecodedText(b);
       if (scoreA.replacements !== scoreB.replacements) {
@@ -1411,9 +1434,9 @@ const parseEml = (buffer) => {
       const trimmed = item.name.trim();
       const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
       if (!looksBroken && trimmed.includes('.')) return item;
-      let match = encodedNames.find((name) => name.startsWith(trimmed));
-      if (!match && encodedNames.length === attachmentsData.length) {
-        match = encodedNames[index];
+      let match = combinedNames.find((name) => name.startsWith(trimmed));
+      if (!match && combinedNames.length === attachmentsData.length) {
+        match = combinedNames[index];
       }
       if (!match) {
         match = bestName;
