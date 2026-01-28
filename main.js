@@ -446,6 +446,15 @@ const repairMojibake = (value) => {
   return best;
 };
 
+const splitHeadersAndBody = (raw) => {
+  if (!raw) return ['', ''];
+  const match = raw.match(/\r?\n\r?\n/);
+  if (!match) return [raw, ''];
+  const idx = match.index ?? raw.length;
+  const sep = match[0]?.length ?? 2;
+  return [raw.slice(0, idx), raw.slice(idx + sep)];
+};
+
 const parseHeaderParams = (value) => {
   if (!value) return { mime: '', params: {} };
   const tokens = [];
@@ -1402,7 +1411,7 @@ const extractFirstFilenameFromRaw = (rawText) => {
 };
 
 const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
-  const [rawHeaders = '', rawBody = ''] = rawPart.split(/\r?\n\r?\n/);
+  const [rawHeaders = '', rawBody = ''] = splitHeadersAndBody(rawPart);
   const headers = parseHeaders(rawHeaders);
   const contentType = headers['content-type'] || 'text/plain';
   const { mime, params } = parseHeaderParams(contentType);
@@ -1539,7 +1548,7 @@ const downloadAttachment = (item) => {
 
 const parseEml = (buffer) => {
   const rawText = latin1FromBuffer(buffer);
-  const [rawHeaders = '', rawBody = ''] = rawText.split(/\r?\n\r?\n/);
+  const [rawHeaders = '', rawBody = ''] = splitHeadersAndBody(rawText);
   const headers = parseHeaders(rawHeaders);
   const subject = decodeAttachmentName(headers.subject || '');
   const from = decodeAddressHeader(headers.from || '');
