@@ -1216,11 +1216,10 @@ const extractAttachments = (text) => {
 const extractEncodedWordFilenames = (text) => {
   const searchText = text.replace(/\r?\n[ \t]+/g, '');
   const names = new Set();
-  const regex =
-    /\b(?:filename|name)\s*=\s*\"?((?:=\?[^?]+\?[bqBQ]\?[^?]+\?=)(?:\s+(?:=\?[^?]+\?[bqBQ]\?[^?]+\?=))*)\"?/gi;
+  const regex = /\b(?:filename|name)\*?=\\??\"?([^\";\\r\\n]+)/gi;
   let match = regex.exec(searchText);
   while (match) {
-    const decoded = decodeMimeWords(match[1].trim());
+    const decoded = decodeHeaderParamValue(match[1].trim());
     if (decoded) names.add(decoded);
     match = regex.exec(searchText);
   }
