@@ -252,10 +252,14 @@ const normalizeEncodedWordSeparators = (value) =>
 
 const fixBrokenEncodedWords = (value) => {
   let fixed = value;
+  // Remove dangling empty encoded-word tokens like "=?=".
+  fixed = fixed.replace(/=\?=\s*/g, '');
+  // Ensure split encoded-words are closed before another encoded-word begins.
   fixed = fixed.replace(/(=\?[^?]+\?[bqBQ]\?)([^?]*?)(?==\?)/g, (match, prefix, body) => {
     if (body.endsWith('?=')) return match;
     return `${prefix}${body}?=`;
   });
+  // Close any trailing encoded-word without ?=
   fixed = fixed.replace(/(=\?[^?]+\?[bqBQ]\?[^?]*$)/g, (match) =>
     match.endsWith('?=') ? match : `${match}?=`
   );
@@ -265,7 +269,7 @@ const fixBrokenEncodedWords = (value) => {
 const decodeMimeWords = (value) => {
   if (!value) return '';
   const normalized = fixBrokenEncodedWords(normalizeEncodedWordSeparators(value));
-  return normalized.replace(/=\?([^?]+)\?([bqBQ])\?([^?]+)\?=/g, (match, charset, enc, text) => {
+  const decoded = normalized.replace(/=\?([^?]+)\?([bqBQ])\?([^?]+)\?=/g, (match, charset, enc, text) => {
     const encoding = enc.toLowerCase();
     let bytes;
     if (encoding === 'b') {
@@ -283,6 +287,7 @@ const decodeMimeWords = (value) => {
     }
     return decodeBytes(bytes, charset);
   });
+  return decoded.replace(/=\?=\s*/g, '').replace(/\s{2,}/g, ' ').trim();
 };
 
 const decodeAttachmentName = (value) => {
