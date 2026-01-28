@@ -273,6 +273,33 @@ const fixBrokenEncodedWords = (value) => {
   return fixed;
 };
 
+const scoreDecodedText = (value) => {
+  const replacements = (value.match(/�/g) || []).length;
+  const hangul = (value.match(/[가-힣]/g) || []).length;
+  return { replacements, hangul };
+};
+
+const pickBestDecoded = (bytes, charset) => {
+  const normalized = normalizeCharset(charset);
+  const candidates = [normalized, 'utf-8', 'euc-kr', 'windows-1252']
+    .filter(Boolean)
+    .filter((value, index, arr) => arr.indexOf(value) === index);
+  let best = decodeBytes(bytes, candidates[0]);
+  let bestScore = scoreDecodedText(best);
+  for (let i = 1; i < candidates.length; i += 1) {
+    const decoded = decodeBytes(bytes, candidates[i]);
+    const score = scoreDecodedText(decoded);
+    if (
+      score.replacements < bestScore.replacements ||
+      (score.replacements === bestScore.replacements && score.hangul > bestScore.hangul)
+    ) {
+      best = decoded;
+      bestScore = score;
+    }
+  }
+  return best;
+};
+
 const decodeMimeWords = (value) => {
   if (!value) return '';
   const normalized = fixBrokenEncodedWords(normalizeEncodedWordSeparators(value));
@@ -292,7 +319,7 @@ const decodeMimeWords = (value) => {
       const normalized = text.replace(/_/g, ' ');
       bytes = decodeQpToBytes(normalized);
     }
-    return decodeBytes(bytes, charset);
+    return pickBestDecoded(bytes, charset);
   });
   return decoded.replace(/=\?=\s*/g, '').replace(/\s{2,}/g, ' ').trim();
 };
@@ -333,12 +360,6 @@ const decodeHeaderParamValue = (rawValue) => {
     }
   }
   return repairMojibake(best.trim());
-};
-
-const scoreDecodedText = (value) => {
-  const replacements = (value.match(/�/g) || []).length;
-  const hangul = (value.match(/[가-힣]/g) || []).length;
-  return { replacements, hangul };
 };
 
 const repairMojibake = (value) => {
