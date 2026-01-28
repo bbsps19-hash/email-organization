@@ -15,6 +15,7 @@ const pagination = document.getElementById('pagination');
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('[data-panel]');
 
+const BUILD_ID = '2026-01-28-attachment-fix';
 const GEMINI_STORAGE_KEY = 'emailOrganizerGeminiPayload';
 const TAB_STORAGE_KEY = 'email_toolkit_tab';
 
@@ -1567,6 +1568,9 @@ const handleFiles = async (fileListInput) => {
         continue;
       }
       const data = parseEml(buffer);
+      const repaired = repairAttachmentData(data.attachmentsData, data.rawText);
+      data.attachmentsData = repaired;
+      data.attachments = repaired.map((item) => decodeAttachmentName(item.name));
       parsed.push({
         id: crypto.randomUUID(),
         fileName: file.name,
@@ -1627,6 +1631,9 @@ dropZone.addEventListener('drop', (event) => {
     handleFiles(event.dataTransfer.files);
   }
 });
+
+window.emailOrganizerBuild = BUILD_ID;
+console.info('[email-organizer] build', BUILD_ID);
 
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => {
