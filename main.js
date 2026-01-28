@@ -308,6 +308,33 @@ const decodeAttachmentName = (value) => {
   return repairMojibake(decoded);
 };
 
+const decodeHeaderParamValue = (rawValue) => {
+  if (!rawValue) return '';
+  const cleaned = rawValue.trim().replace(/(^\"|\"$)/g, '');
+  const decodedRfc = decodeRfc2231(cleaned);
+  const decoded = decodeMimeWords(decodedRfc).trim();
+  if (!/�/.test(decoded)) return decoded;
+  const bytes = latin1ToBytes(cleaned);
+  const candidates = [
+    decoded,
+    decodeBytes(bytes, 'euc-kr'),
+    decodeBytes(bytes, 'utf-8'),
+  ];
+  let best = candidates[0];
+  let bestScore = scoreDecodedText(best);
+  for (let i = 1; i < candidates.length; i += 1) {
+    const score = scoreDecodedText(candidates[i]);
+    if (
+      score.replacements < bestScore.replacements ||
+      (score.replacements === bestScore.replacements && score.hangul > bestScore.hangul)
+    ) {
+      best = candidates[i];
+      bestScore = score;
+    }
+  }
+  return repairMojibake(best.trim());
+};
+
 const scoreDecodedText = (value) => {
   const replacements = (value.match(/�/g) || []).length;
   const hangul = (value.match(/[가-힣]/g) || []).length;
@@ -1059,7 +1086,7 @@ const extractFilenameFromHeaders = (headers) => {
     typeParams['name*'] ||
     typeParams.name;
   if (!raw) return '';
-  return decodeMimeWords(decodeRfc2231(cleanParamValue(raw))).trim();
+  return decodeHeaderParamValue(cleanParamValue(raw));
 };
 
 const extractAttachments = (text) => {
@@ -1103,12 +1130,12 @@ const extractAttachments = (text) => {
   });
   let match = filenameRegex.exec(searchText);
   while (match) {
-    names.add(decodeMimeWords(decodeRfc2231(match[1].trim())));
+    names.add(decodeHeaderParamValue(match[1].trim()));
     match = filenameRegex.exec(searchText);
   }
   match = nameRegex.exec(searchText);
   while (match) {
-    names.add(decodeMimeWords(decodeRfc2231(match[1].trim())));
+    names.add(decodeHeaderParamValue(match[1].trim()));
     match = nameRegex.exec(searchText);
   }
   return Array.from(names).filter(Boolean);
