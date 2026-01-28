@@ -8,7 +8,7 @@ const jsonResponse = (res, status, payload) => {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(body);
@@ -122,10 +122,15 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     });
     res.end();
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/health') {
+    jsonResponse(res, 200, { ok: true });
     return;
   }
 

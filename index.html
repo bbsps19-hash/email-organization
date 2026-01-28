@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>이메일 정리기</title>
-  <link href="/style.css?v=20260127-13" rel="stylesheet" />
+  <link href="/style.css?v=20260128-01" rel="stylesheet" />
 </head>
 <body>
   <main class="page">
@@ -16,8 +16,36 @@
           <button type="button" class="lang-btn" data-lang="en">EN</button>
         </div>
       </div>
-      <h1 data-i18n="title">이메일 정리기</h1>
-      <p class="subtitle" data-i18n="subtitle">.eml 파일을 드래그하거나 선택해 정리 준비를 시작하세요.</p>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1 data-i18n="title">이메일 정리기</h1>
+          <p class="subtitle" data-i18n="subtitle">.eml 파일을 드래그하거나 선택해 정리 준비를 시작하세요.</p>
+          <div class="hero-tags" role="list">
+            <span class="tag" data-i18n="tagLocal">로컬 처리</span>
+            <span class="tag" data-i18n="tagFast">빠른 필터</span>
+            <span class="tag" data-i18n="tagSafe">첨부파일 안전</span>
+          </div>
+          <div class="hero-metrics">
+            <div class="metric">
+              <span data-i18n="metricOneLabel">업로드</span>
+              <strong data-i18n="metricOneValue">다중 .eml</strong>
+            </div>
+            <div class="metric">
+              <span data-i18n="metricTwoLabel">분류</span>
+              <strong data-i18n="metricTwoValue">자동 규칙</strong>
+            </div>
+            <div class="metric">
+              <span data-i18n="metricThreeLabel">요약</span>
+              <strong data-i18n="metricThreeValue">미리보기</strong>
+            </div>
+          </div>
+        </div>
+        <div class="hero-panel" aria-hidden="true">
+          <div class="hero-card hero-card--a"></div>
+          <div class="hero-card hero-card--b"></div>
+          <div class="hero-card hero-card--c"></div>
+        </div>
+      </div>
     </header>
 
     <section class="upload-card" aria-labelledby="upload-title">
@@ -114,6 +142,6 @@
     </section>
   </main>
 
-  <script defer src="/main.js?v=20260127-13"></script>
+  <script defer src="/main.js?v=20260128-01"></script>
 </body>
 </html>

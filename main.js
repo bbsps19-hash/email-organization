@@ -53,6 +53,15 @@ const translations = {
   ko: {
     title: '이메일 정리기',
     subtitle: '.eml 파일을 드래그하거나 선택해 정리 준비를 시작하세요.',
+    tagLocal: '로컬 처리',
+    tagFast: '빠른 필터',
+    tagSafe: '첨부파일 안전',
+    metricOneLabel: '업로드',
+    metricOneValue: '다중 .eml',
+    metricTwoLabel: '분류',
+    metricTwoValue: '자동 규칙',
+    metricThreeLabel: '요약',
+    metricThreeValue: '미리보기',
     uploadTitle: '.eml 가져오기',
     uploadHint: '메시지 원본(.eml)만 업로드됩니다. 다중 선택 가능.',
     dropTitle: '파일을 드래그해서 놓기',
@@ -82,6 +91,10 @@ const translations = {
     geminiPlaceholder: '예: 견적/도면/계약 관련 메일만 보고 싶어',
     resultButton: '결과 보기',
     geminiHint: 'Gemini CLI 연동은 로컬 설정이 필요합니다. 연결되면 자동 분류됩니다.',
+    geminiCheck: '서버 상태 확인',
+    geminiChecking: 'Gemini 서버 상태 확인 중...',
+    geminiCheckOk: 'Gemini 서버 연결됨.',
+    geminiCheckFail: 'Gemini 서버에 연결할 수 없습니다.',
     geminiRunning: 'Gemini 분류 중...',
     geminiSuccess: (count) => `Gemini 분류 완료: ${count}개 매칭`,
     geminiError: 'Gemini 서버에 연결할 수 없습니다.',
@@ -106,6 +119,15 @@ const translations = {
   en: {
     title: 'Email Organizer',
     subtitle: 'Drag and drop .eml files or select them to start organizing.',
+    tagLocal: 'Local processing',
+    tagFast: 'Fast filters',
+    tagSafe: 'Safe attachments',
+    metricOneLabel: 'Upload',
+    metricOneValue: 'Multi .eml',
+    metricTwoLabel: 'Classify',
+    metricTwoValue: 'Auto rules',
+    metricThreeLabel: 'Summary',
+    metricThreeValue: 'Preview',
     uploadTitle: 'Import .eml',
     uploadHint: 'Only raw .eml messages are accepted. Multiple selection allowed.',
     dropTitle: 'Drop files here',
@@ -135,6 +157,10 @@ const translations = {
     geminiPlaceholder: 'e.g., Only quotes/drawings/contracts',
     resultButton: 'View results',
     geminiHint: 'Gemini CLI requires local setup. Once connected, it will auto-classify.',
+    geminiCheck: 'Check server status',
+    geminiChecking: 'Checking Gemini server...',
+    geminiCheckOk: 'Gemini server connected.',
+    geminiCheckFail: 'Could not reach Gemini server.',
     geminiRunning: 'Running Gemini...',
     geminiSuccess: (count) => `Gemini matched ${count} emails.`,
     geminiError: 'Could not reach Gemini server.',
@@ -492,6 +518,24 @@ const setGeminiStatusFromStorage = () => {
   }
 };
 
+const checkGeminiServer = async () => {
+  const t = translations[state.lang];
+  setGeminiStatus(t.geminiChecking);
+  try {
+    const response = await fetch('http://localhost:8787/health', { method: 'GET' });
+    if (!response.ok) {
+      throw new Error(`HTTP_${response.status}`);
+    }
+    const data = await response.json();
+    if (!data || data.ok !== true) {
+      throw new Error('BAD_RESPONSE');
+    }
+    setGeminiStatus(t.geminiCheckOk);
+  } catch (error) {
+    setGeminiStatus(t.geminiCheckFail);
+  }
+};
+
 const renderFilterPanel = () => {
   if (!filterPanel) return;
   const t = translations[state.lang];
@@ -512,6 +556,9 @@ const renderFilterPanel = () => {
       <label class="filter-label" for="geminiPrompt" data-i18n="geminiPrompt">${t.geminiPrompt}</label>
       <textarea id="geminiPrompt" rows="4" placeholder="${t.geminiPlaceholder}">${state.geminiRule}</textarea>
       <p class="hint" data-i18n="geminiHint">${t.geminiHint}</p>
+      <div class="gemini-tools">
+        <button type="button" class="file-button status-button" id="geminiCheck" data-i18n="geminiCheck">${t.geminiCheck}</button>
+      </div>
       <p class="hint" id="geminiStatus" aria-live="polite"></p>
     `;
     const textarea = document.getElementById('geminiPrompt');
@@ -537,6 +584,10 @@ const renderFilterPanel = () => {
           // Ignore storage errors.
         }
       });
+    }
+    const checkButton = document.getElementById('geminiCheck');
+    if (checkButton) {
+      checkButton.addEventListener('click', checkGeminiServer);
     }
     setGeminiStatusFromStorage();
     setGeminiResponse(t.geminiDefaultReply);
