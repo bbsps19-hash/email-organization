@@ -90,7 +90,7 @@ const translations = {
     geminiPrompt: '분류 기준 설명',
     geminiPlaceholder: '예: 견적/도면/계약 관련 메일만 보고 싶어',
     resultButton: '결과 보기',
-    geminiHint: 'Gemini CLI 연동은 로컬 설정이 필요합니다. 연결되면 자동 분류됩니다.',
+    geminiHint: 'Cloudflare Pages Functions를 통해 분류합니다. 대시보드 환경 변수에 GEMINI_API_KEY를 설정하세요.',
     geminiCheck: '서버 상태 확인',
     geminiChecking: 'Gemini 서버 상태 확인 중...',
     geminiCheckOk: 'Gemini 서버 연결됨.',
@@ -98,7 +98,7 @@ const translations = {
     geminiRunning: 'Gemini 분류 중...',
     geminiSuccess: (count) => `Gemini 분류 완료: ${count}개 매칭`,
     geminiError: 'Gemini 서버에 연결할 수 없습니다.',
-    geminiSetup: 'Gemini CLI 인증이 필요합니다. 터미널에서 `gemini` 실행 후 인증을 완료하세요.',
+    geminiSetup: 'Gemini API 키가 필요합니다. Cloudflare Pages 환경 변수(GEMINI_API_KEY)를 설정하세요.',
     geminiStored: '이전에 실행한 Gemini 결과가 있습니다.',
     geminiDefaultReply: '요청하신 기준으로 메일을 분류해드리겠습니다.',
     geminiResponseLabel: 'Gemini 답변',
@@ -156,7 +156,7 @@ const translations = {
     geminiPrompt: 'Describe your criteria',
     geminiPlaceholder: 'e.g., Only quotes/drawings/contracts',
     resultButton: 'View results',
-    geminiHint: 'Gemini CLI requires local setup. Once connected, it will auto-classify.',
+    geminiHint: 'Classification runs via Cloudflare Pages Functions. Set GEMINI_API_KEY in the Pages environment.',
     geminiCheck: 'Check server status',
     geminiChecking: 'Checking Gemini server...',
     geminiCheckOk: 'Gemini server connected.',
@@ -164,7 +164,7 @@ const translations = {
     geminiRunning: 'Running Gemini...',
     geminiSuccess: (count) => `Gemini matched ${count} emails.`,
     geminiError: 'Could not reach Gemini server.',
-    geminiSetup: 'Gemini CLI needs authentication. Run `gemini` in a terminal to finish setup.',
+    geminiSetup: 'Gemini API key is required. Set GEMINI_API_KEY in Cloudflare Pages.',
     geminiStored: 'Saved Gemini results are available.',
     geminiDefaultReply: 'I will classify emails based on your criteria.',
     geminiResponseLabel: 'Gemini Response',
@@ -522,7 +522,7 @@ const checkGeminiServer = async () => {
   const t = translations[state.lang];
   setGeminiStatus(t.geminiChecking);
   try {
-    const response = await fetch('http://localhost:8787/health', { method: 'GET' });
+    const response = await fetch('/api/health', { method: 'GET' });
     if (!response.ok) {
       throw new Error(`HTTP_${response.status}`);
     }
@@ -644,7 +644,7 @@ const runGeminiClassification = async () => {
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     console.log('[gemini] request', payload);
-    const response = await fetch('http://localhost:8787/classify', {
+    const response = await fetch('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
