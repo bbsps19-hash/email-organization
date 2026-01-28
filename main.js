@@ -254,6 +254,10 @@ const fixBrokenEncodedWords = (value) => {
   let fixed = value;
   // Remove dangling empty encoded-word tokens like "=?=".
   fixed = fixed.replace(/=\?=\s*/g, '');
+  // Close encoded-words that are followed by an address without ?=
+  fixed = fixed.replace(/(=\?[^?]+\?[bqBQ]\?[^?]*)(\s*<[^>]+>)/g, (match, token, addr) => {
+    return token.endsWith('?=') ? match : `${token}?=${addr}`;
+  });
   // Ensure split encoded-words are closed before another encoded-word begins.
   fixed = fixed.replace(/(=\?[^?]+\?[bqBQ]\?)([^?]*?)(?==\?)/g, (match, prefix, body) => {
     if (body.endsWith('?=')) return match;
