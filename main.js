@@ -1085,6 +1085,20 @@ const extractAttachments = (text) => {
   return Array.from(names).filter(Boolean);
 };
 
+const extractEncodedWordFilenames = (text) => {
+  const searchText = text.replace(/\r?\n[ \t]+/g, ' ');
+  const names = new Set();
+  const regex =
+    /\b(?:filename|name)\s*=\s*\"?((?:=\?[^?]+\?[bqBQ]\?[^?]+\?=)(?:\s+(?:=\?[^?]+\?[bqBQ]\?[^?]+\?=))*)\"?/gi;
+  let match = regex.exec(searchText);
+  while (match) {
+    const decoded = decodeMimeWords(match[1].trim());
+    if (decoded) names.add(decoded);
+    match = regex.exec(searchText);
+  }
+  return Array.from(names).filter(Boolean);
+};
+
 const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
   const [rawHeaders = '', rawBody = ''] = rawPart.split(/\r?\n\r?\n/);
   const headers = parseHeaders(rawHeaders);
@@ -1249,6 +1263,16 @@ const parseEml = (buffer) => {
   const preferred = texts.find((part) => part.mime === 'text/plain') || texts[0];
   const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
+  const encodedNames = extractEncodedWordFilenames(rawText);
+  if (encodedNames.length) {
+    attachmentsData = attachmentsData.map((item) => {
+      if (typeof item.name !== 'string') return item;
+      const trimmed = item.name.trim();
+      if (!trimmed || (!trimmed.endsWith('-') && trimmed.includes('.'))) return item;
+      const match = encodedNames.find((name) => name.startsWith(trimmed));
+      return match ? { ...item, name: match } : item;
+    });
+  }
   const attachments = attachmentsData.map((item) => decodeAttachmentName(item.name));
   const category = classify(subject, body, attachments);
   const hasTruncatedAttachment = attachmentsData.some(
