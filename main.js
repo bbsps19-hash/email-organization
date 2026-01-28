@@ -1037,16 +1037,20 @@ const renderPagination = (totalPages) => {
 const parseHeaders = (rawHeaders) => {
   const lines = rawHeaders.split(/\r?\n/);
   const unfolded = [];
+  const rawUnfolded = [];
   lines.forEach((line) => {
     if (/^[\t ]/.test(line) && unfolded.length) {
       unfolded[unfolded.length - 1] += ` ${line.trim()}`;
+      rawUnfolded[rawUnfolded.length - 1] += line.replace(/^[\t ]+/, '');
     } else {
       unfolded.push(line.trim());
+      rawUnfolded.push(line);
     }
   });
 
   const headers = {};
-  unfolded.forEach((line) => {
+  const rawMap = {};
+  unfolded.forEach((line, index) => {
     const idx = line.indexOf(':');
     if (idx === -1) return;
     const key = line.slice(0, idx).toLowerCase();
@@ -1058,7 +1062,12 @@ const parseHeaders = (rawHeaders) => {
       key !== 'mime-version';
     const value = shouldDecode ? decodeMimeWords(rawValue) : rawValue;
     headers[key] = headers[key] ? `${headers[key]}, ${value}` : value;
+    const rawLine = rawUnfolded[index] || line;
+    const rawIdx = rawLine.indexOf(':');
+    const rawHeaderValue = rawIdx === -1 ? '' : rawLine.slice(rawIdx + 1).replace(/^\s+/, '');
+    rawMap[key] = rawMap[key] ? `${rawMap[key]}, ${rawHeaderValue}` : rawHeaderValue;
   });
+  headers.__raw = rawMap;
   return headers;
 };
 
@@ -1113,8 +1122,8 @@ const extractRfc2231Continuations = (headerValue, baseKey) => {
 };
 
 const extractFilenameFromHeaders = (headers) => {
-  const disposition = headers['content-disposition'] || '';
-  const type = headers['content-type'] || '';
+  const disposition = headers.__raw?.['content-disposition'] || headers['content-disposition'] || '';
+  const type = headers.__raw?.['content-type'] || headers['content-type'] || '';
   const continuation =
     extractRfc2231Continuations(disposition, 'filename') ||
     extractRfc2231Continuations(type, 'name');
@@ -1153,7 +1162,7 @@ const extractFilenameFromHeaders = (headers) => {
 };
 
 const extractAttachments = (text) => {
-  const searchText = text.replace(/\r?\n[ \t]+/g, ' ');
+  const searchText = text.replace(/\r?\n[ \t]+/g, '');
   const names = new Set();
   const filenameRegex = /filename\\*?=\\??\"?([^\";\\r\\n]+)/gi;
   const nameRegex = /name\\*?=\\??\"?([^\";\\r\\n]+)/gi;
@@ -1205,7 +1214,7 @@ const extractAttachments = (text) => {
 };
 
 const extractEncodedWordFilenames = (text) => {
-  const searchText = text.replace(/\r?\n[ \t]+/g, ' ');
+  const searchText = text.replace(/\r?\n[ \t]+/g, '');
   const names = new Set();
   const regex =
     /\b(?:filename|name)\s*=\s*\"?((?:=\?[^?]+\?[bqBQ]\?[^?]+\?=)(?:\s+(?:=\?[^?]+\?[bqBQ]\?[^?]+\?=))*)\"?/gi;
