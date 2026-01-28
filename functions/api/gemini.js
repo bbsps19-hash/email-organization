@@ -60,8 +60,10 @@ const buildEmailPayload = (emails) =>
     subject: email.subject || '',
     from: email.from || '',
     snippet: email.snippet || '',
-    attachments: Array.isArray(email.attachments) ? email.attachments : [],
-  }));
+  attachments: Array.isArray(email.attachments) ? email.attachments : [],
+  fileName: email.fileName || '',
+  body: email.body || '',
+}));
 
 export const onRequest = async ({ request, env }) => {
   if (request.method === 'OPTIONS') {

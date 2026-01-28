@@ -39,6 +39,59 @@ const state = {
   pageSize: 100,
 };
 
+const DEBUG =
+  window.location.hostname === 'localhost' ||
+  window.location.search.includes('debug=1') ||
+  window.location.search.includes('debug=true');
+
+const normalizeText = (value) => {
+  if (!value) return '';
+  return String(value)
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const extractTerms = (text) => {
+  const normalized = normalizeText(text);
+  if (!normalized) return [];
+  const chunks = normalized.split(/[,\n]/).flatMap((part) => part.split(/\s+/));
+  return Array.from(new Set(chunks.filter(Boolean)));
+};
+
+const matchesTerms = (haystack, terms) => {
+  if (!terms.length) return true;
+  const hits = terms.filter((term) => haystack.includes(term));
+  if (terms.length <= 3) return hits.length === terms.length;
+  return hits.length >= 2;
+};
+
+const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
+  const terms = Array.from(new Set([...extractTerms(prompt), ...keywords.map(normalizeText)].filter(Boolean)));
+  const results = emails.filter((email) => {
+    const haystack = normalizeText(
+      [
+        email.subject,
+        email.body,
+        email.snippet,
+        email.fileName,
+        email.from,
+        email.to,
+        Array.isArray(email.attachments) ? email.attachments.join(' ') : '',
+      ].join(' ')
+    );
+    return matchesTerms(haystack, terms);
+  });
+  if (DEBUG) {
+    console.log('[gemini][filter] prompt', prompt);
+    console.log('[gemini][filter] terms', terms);
+    console.log('[gemini][filter] total emails', emails.length);
+    console.log('[gemini][filter] matched emails', results.length);
+  }
+  return { results, terms };
+};
+
 const renderList = (emails) => {
   list.innerHTML = '';
   const totalPages = Math.max(1, Math.ceil(emails.length / state.pageSize));
@@ -141,9 +194,28 @@ const loadGeminiData = () => {
     const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : { emails: [] };
     const matches = Array.isArray(gemini.matches) ? gemini.matches : [];
     const emails = Array.isArray(snapshot.emails) ? snapshot.emails : [];
-    const selected = Array.isArray(gemini.results) && gemini.results.length
+    let selected = Array.isArray(gemini.results) && gemini.results.length
       ? gemini.results
       : emails.filter((email) => matches.includes(email.id));
+    let appliedTerms = [];
+    if (!selected.length && (gemini.prompt || normalizedRule)) {
+      const fallback = filterEmailsByCriteria(
+        emails,
+        gemini.prompt || normalizedRule,
+        Array.isArray(gemini.keywords) ? gemini.keywords : []
+      );
+      selected = fallback.results;
+      appliedTerms = fallback.terms;
+    }
+    if (DEBUG) {
+      console.log('[gemini] snapshot emails', emails.length);
+      console.log('[gemini] matches from api', matches.length);
+      console.log('[gemini] selected emails', selected.length);
+      if (appliedTerms.length) console.log('[gemini] applied fallback terms', appliedTerms);
+      if (!emails.length) {
+        console.warn('[gemini] no snapshot emails loaded; check emailOrganizerSnapshot storage');
+      }
+    }
     return {
       matches,
       prompt: gemini.prompt || normalizedRule || '',
@@ -165,6 +237,8 @@ const callGemini = async (prompt, emails) => {
       subject: email.subject,
       from: email.from,
       snippet: email.snippet,
+      body: email.body,
+      fileName: email.fileName,
       attachments: email.attachments,
     })),
   };

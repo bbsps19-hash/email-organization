@@ -629,13 +629,20 @@ const runGeminiClassification = async () => {
     // Ignore storage errors.
   }
 
+  const truncate = (value, max = 2000) => {
+    if (!value) return '';
+    const text = String(value);
+    return text.length > max ? `${text.slice(0, max)}…` : text;
+  };
   const payload = {
     prompt: state.geminiRule.trim(),
     emails: state.emails.map((email) => ({
       id: email.id,
       subject: email.subject,
       from: email.from,
-      snippet: email.snippet,
+      snippet: truncate(email.snippet, 600),
+      body: truncate(email.body, 2000),
+      fileName: email.fileName,
       attachments: email.attachments,
     })),
   };
@@ -751,6 +758,7 @@ const persistSnapshots = () => {
       to: email.to,
       date: email.date,
       snippet: email.snippet,
+      body: email.body,
       category: email.category,
       attachments: email.attachments,
       size: email.size,
