@@ -1428,7 +1428,7 @@ const parseEml = (buffer) => {
     attachments,
     attachmentsData,
     category,
-    rawText: hasTruncatedAttachment || hasMojibakeAttachment ? rawText : null,
+    rawText,
   };
 };
 
