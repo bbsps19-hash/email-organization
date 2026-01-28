@@ -1272,6 +1272,46 @@ const extractHeaderFilenameEntries = (text) => {
   return entries;
 };
 
+const repairAttachmentData = (emailAttachments, rawText) => {
+  if (!Array.isArray(emailAttachments) || !emailAttachments.length || !rawText) return emailAttachments;
+  const entries = extractHeaderFilenameEntries(rawText);
+  const filenameList = entries.filter((item) => item.kind === 'filename').map((item) => item.value);
+  const nameList = entries.filter((item) => item.kind === 'name').map((item) => item.value);
+  const orderedNames = filenameList.length ? filenameList : nameList;
+  const encodedNames = extractEncodedWordFilenames(rawText);
+  const rawNames = extractHeaderFilenamesFromRaw(rawText);
+  const combinedNames = Array.from(new Set([...orderedNames, ...rawNames, ...encodedNames]));
+  if (!combinedNames.length) return emailAttachments;
+  const rankedNames = [...combinedNames].sort((a, b) => {
+    const scoreA = scoreDecodedText(a);
+    const scoreB = scoreDecodedText(b);
+    if (scoreA.replacements !== scoreB.replacements) {
+      return scoreA.replacements - scoreB.replacements;
+    }
+    if (scoreA.hangul !== scoreB.hangul) {
+      return scoreB.hangul - scoreA.hangul;
+    }
+    return b.length - a.length;
+  });
+  const bestName = rankedNames[0];
+  return emailAttachments.map((item, index) => {
+    if (typeof item.name !== 'string') return item;
+    const trimmed = item.name.trim();
+    const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
+    if (!looksBroken && trimmed.includes('.')) return item;
+    let match = combinedNames.find((name) => name.startsWith(trimmed));
+    if (!match && orderedNames.length) {
+      match = orderedNames[Math.min(index, orderedNames.length - 1)];
+    } else if (!match && combinedNames.length === emailAttachments.length) {
+      match = combinedNames[index];
+    }
+    if (!match) {
+      match = bestName;
+    }
+    return match ? { ...item, name: match } : item;
+  });
+};
+
 const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
   const [rawHeaders = '', rawBody = ''] = rawPart.split(/\r?\n\r?\n/);
   const headers = parseHeaders(rawHeaders);
@@ -1340,42 +1380,14 @@ const renderSummary = (id) => {
   }
 
   if (email?.rawText && Array.isArray(email.attachmentsData) && email.attachmentsData.length) {
-    const entries = extractHeaderFilenameEntries(email.rawText);
-    const filenameList = entries.filter((item) => item.kind === 'filename').map((item) => item.value);
-    const nameList = entries.filter((item) => item.kind === 'name').map((item) => item.value);
-    const orderedNames = filenameList.length ? filenameList : nameList;
-    const encodedNames = extractEncodedWordFilenames(email.rawText);
-    const rawNames = extractHeaderFilenamesFromRaw(email.rawText);
-    const combinedNames = Array.from(new Set([...orderedNames, ...rawNames, ...encodedNames]));
-    if (combinedNames.length) {
-      const rankedNames = [...combinedNames].sort((a, b) => {
-        const scoreA = scoreDecodedText(a);
-        const scoreB = scoreDecodedText(b);
-        if (scoreA.replacements !== scoreB.replacements) {
-          return scoreA.replacements - scoreB.replacements;
-        }
-        if (scoreA.hangul !== scoreB.hangul) {
-          return scoreB.hangul - scoreA.hangul;
-        }
-        return b.length - a.length;
-      });
-      const bestName = rankedNames[0];
-      const repaired = email.attachmentsData.map((item, index) => {
-        if (typeof item.name !== 'string') return item;
-        const trimmed = item.name.trim();
-        const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
-        if (!looksBroken && trimmed.includes('.')) return item;
-        let match = combinedNames.find((name) => name.startsWith(trimmed));
-        if (!match && orderedNames.length) {
-          match = orderedNames[Math.min(index, orderedNames.length - 1)];
-        } else if (!match && combinedNames.length === email.attachmentsData.length) {
-          match = combinedNames[index];
-        }
-        if (!match) match = bestName;
-        return match ? { ...item, name: match } : item;
-      });
-      const repairedAttachments = repaired.map((item) => decodeAttachmentName(item.name));
+    const repaired = repairAttachmentData(email.attachmentsData, email.rawText);
+    const repairedAttachments = repaired.map((item) => decodeAttachmentName(item.name));
+    if (
+      repairedAttachments.join('\u0000') !== email.attachments.join('\u0000') ||
+      repaired.some((item, index) => item.name !== email.attachmentsData[index]?.name)
+    ) {
       email = { ...email, attachmentsData: repaired, attachments: repairedAttachments };
+      state.emails = state.emails.map((item) => (item.id === email.id ? email : item));
     }
   }
   const label = categoryLabels[email.category]?.[state.lang] ?? '-';
@@ -1475,45 +1487,7 @@ const parseEml = (buffer) => {
   const preferred = texts.find((part) => part.mime === 'text/plain') || texts[0];
   const body = preferred ? cleanBody(preferred.text) : '';
   const snippet = body.slice(0, 200);
-  const applyRawNames = (emailAttachments) => {
-    const entries = extractHeaderFilenameEntries(rawText);
-    const filenameList = entries.filter((item) => item.kind === 'filename').map((item) => item.value);
-    const nameList = entries.filter((item) => item.kind === 'name').map((item) => item.value);
-    const orderedNames = filenameList.length ? filenameList : nameList;
-    const encodedNames = extractEncodedWordFilenames(rawText);
-    const rawNames = extractHeaderFilenamesFromRaw(rawText);
-    const combinedNames = Array.from(new Set([...orderedNames, ...rawNames, ...encodedNames]));
-    if (!combinedNames.length || !emailAttachments.length) return emailAttachments;
-    const rankedNames = [...combinedNames].sort((a, b) => {
-      const scoreA = scoreDecodedText(a);
-      const scoreB = scoreDecodedText(b);
-      if (scoreA.replacements !== scoreB.replacements) {
-        return scoreA.replacements - scoreB.replacements;
-      }
-      if (scoreA.hangul !== scoreB.hangul) {
-        return scoreB.hangul - scoreA.hangul;
-      }
-      return b.length - a.length;
-    });
-    const bestName = rankedNames[0];
-    return emailAttachments.map((item, index) => {
-      if (typeof item.name !== 'string') return item;
-      const trimmed = item.name.trim();
-      const looksBroken = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(trimmed) || trimmed.endsWith('-');
-      if (!looksBroken && trimmed.includes('.')) return item;
-      let match = combinedNames.find((name) => name.startsWith(trimmed));
-      if (!match && orderedNames.length) {
-        match = orderedNames[Math.min(index, orderedNames.length - 1)];
-      } else if (!match && combinedNames.length === emailAttachments.length) {
-        match = combinedNames[index];
-      }
-      if (!match) {
-        match = bestName;
-      }
-      return match ? { ...item, name: match } : item;
-    });
-  };
-  attachmentsData = applyRawNames(attachmentsData);
+  attachmentsData = repairAttachmentData(attachmentsData, rawText);
   const attachments = attachmentsData.map((item) => decodeAttachmentName(item.name));
   const category = classify(subject, body, attachments);
   const hasTruncatedAttachment = attachmentsData.some(
