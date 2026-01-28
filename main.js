@@ -961,9 +961,47 @@ const decodeRfc2231 = (value) => {
   }
 };
 
+const extractRfc2231Continuations = (headerValue, baseKey) => {
+  if (!headerValue) return '';
+  const regex = new RegExp(`${baseKey}\\*(\\d+)\\*?=([^;\\r\\n]+)`, 'gi');
+  const segments = [];
+  let match = regex.exec(headerValue);
+  while (match) {
+    const idx = Number(match[1]);
+    const encoded = new RegExp(`${baseKey}\\*${match[1]}\\*=`).test(match[0]);
+    const raw = match[2].trim().replace(/(^\"|\"$)/g, '');
+    segments.push({ idx, encoded, value: raw });
+    match = regex.exec(headerValue);
+  }
+  if (!segments.length) return '';
+  segments.sort((a, b) => a.idx - b.idx);
+  let charset = null;
+  const bytes = [];
+  segments.forEach((segment, index) => {
+    let part = segment.value;
+    if (segment.encoded && index === 0 && part.includes("''")) {
+      const [cs, restPart] = part.split("''");
+      charset = normalizeCharset(cs);
+      part = restPart;
+    }
+    if (segment.encoded) {
+      bytes.push(...percentToBytes(part));
+    } else {
+      bytes.push(...latin1ToBytes(part));
+    }
+  });
+  return decodeBytes(Uint8Array.from(bytes), charset || 'utf-8');
+};
+
 const extractFilenameFromHeaders = (headers) => {
   const disposition = headers['content-disposition'] || '';
   const type = headers['content-type'] || '';
+  const continuation =
+    extractRfc2231Continuations(disposition, 'filename') ||
+    extractRfc2231Continuations(type, 'name');
+  if (continuation) {
+    return decodeMimeWords(continuation).trim();
+  }
   const dispositionParams = parseHeaderParams(disposition).params;
   const typeParams = parseHeaderParams(type).params;
   const cleanParamValue = (value) => {
@@ -999,6 +1037,40 @@ const extractAttachments = (text) => {
   const names = new Set();
   const filenameRegex = /filename\\*?=\\??\"?([^\";\\r\\n]+)/gi;
   const nameRegex = /name\\*?=\\??\"?([^\";\\r\\n]+)/gi;
+  const continuationRegex = /(filename|name)\\*(\\d+)\\*?=([^;\\r\\n]+)/gi;
+  const continuationBuckets = { filename: new Map(), name: new Map() };
+  let contMatch = continuationRegex.exec(text);
+  while (contMatch) {
+    const base = contMatch[1].toLowerCase();
+    const idx = Number(contMatch[2]);
+    const raw = contMatch[3].trim().replace(/(^\"|\"$)/g, '');
+    const encoded = contMatch[0].includes('*=');
+    if (!continuationBuckets[base].has(idx)) {
+      continuationBuckets[base].set(idx, { idx, encoded, value: raw });
+    }
+    contMatch = continuationRegex.exec(text);
+  }
+  ['filename', 'name'].forEach((base) => {
+    if (!continuationBuckets[base].size) return;
+    const segments = Array.from(continuationBuckets[base].values()).sort((a, b) => a.idx - b.idx);
+    let charset = null;
+    const bytes = [];
+    segments.forEach((segment, index) => {
+      let part = segment.value;
+      if (segment.encoded && index === 0 && part.includes("''")) {
+        const [cs, restPart] = part.split("''");
+        charset = normalizeCharset(cs);
+        part = restPart;
+      }
+      if (segment.encoded) {
+        bytes.push(...percentToBytes(part));
+      } else {
+        bytes.push(...latin1ToBytes(part));
+      }
+    });
+    const combined = decodeBytes(Uint8Array.from(bytes), charset || 'utf-8');
+    if (combined) names.add(decodeMimeWords(combined));
+  });
   let match = filenameRegex.exec(text);
   while (match) {
     names.add(decodeMimeWords(decodeRfc2231(match[1].trim())));
@@ -1045,6 +1117,9 @@ const parsePart = (rawPart, inheritedCharset = 'utf-8') => {
       name: decodeAttachmentName(filename || 'attachment'),
       type: mime || 'application/octet-stream',
       bytes: bodyBytes,
+      rawHeaders,
+      rawContentType: headers['content-type'] || '',
+      rawDisposition: headers['content-disposition'] || '',
     });
   }
 
