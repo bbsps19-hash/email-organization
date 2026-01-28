@@ -1392,6 +1392,18 @@ const parseEml = (buffer) => {
   const snippet = body.slice(0, 200);
   const encodedNames = extractEncodedWordFilenames(rawText);
   if (encodedNames.length) {
+    const rankedNames = [...encodedNames].sort((a, b) => {
+      const scoreA = scoreDecodedText(a);
+      const scoreB = scoreDecodedText(b);
+      if (scoreA.replacements !== scoreB.replacements) {
+        return scoreA.replacements - scoreB.replacements;
+      }
+      if (scoreA.hangul !== scoreB.hangul) {
+        return scoreB.hangul - scoreA.hangul;
+      }
+      return b.length - a.length;
+    });
+    const bestName = rankedNames[0];
     attachmentsData = attachmentsData.map((item, index) => {
       if (typeof item.name !== 'string') return item;
       const trimmed = item.name.trim();
@@ -1401,8 +1413,8 @@ const parseEml = (buffer) => {
       if (!match && encodedNames.length === attachmentsData.length) {
         match = encodedNames[index];
       }
-      if (!match && encodedNames.length === 1) {
-        match = encodedNames[0];
+      if (!match) {
+        match = bestName;
       }
       return match ? { ...item, name: match } : item;
     });
