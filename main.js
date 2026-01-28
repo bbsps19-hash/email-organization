@@ -248,11 +248,23 @@ const decodeQpToBytes = (input) => {
 };
 
 const normalizeEncodedWordSeparators = (value) =>
-  value.replace(/(\?=)\s*,\s*(=\?)/g, '$1 $2');
+  value.replace(/(\?=)\s*,\s*(=\?)/g, '$1 $2').replace(/(\?=)\s+(=\?)/g, '$1 $2');
+
+const fixBrokenEncodedWords = (value) => {
+  let fixed = value;
+  fixed = fixed.replace(/(=\?[^?]+\?[bqBQ]\?)([^?]*?)(?==\?)/g, (match, prefix, body) => {
+    if (body.endsWith('?=')) return match;
+    return `${prefix}${body}?=`;
+  });
+  fixed = fixed.replace(/(=\?[^?]+\?[bqBQ]\?[^?]*$)/g, (match) =>
+    match.endsWith('?=') ? match : `${match}?=`
+  );
+  return fixed;
+};
 
 const decodeMimeWords = (value) => {
   if (!value) return '';
-  const normalized = normalizeEncodedWordSeparators(value);
+  const normalized = fixBrokenEncodedWords(normalizeEncodedWordSeparators(value));
   return normalized.replace(/=\?([^?]+)\?([bqBQ])\?([^?]+)\?=/g, (match, charset, enc, text) => {
     const encoding = enc.toLowerCase();
     let bytes;
