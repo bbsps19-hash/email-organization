@@ -1278,7 +1278,15 @@ const repairAttachmentData = (emailAttachments, rawText) => {
   const entries = extractHeaderFilenameEntries(rawText);
   const filenameList = entries.filter((item) => item.kind === 'filename').map((item) => item.value);
   const nameList = entries.filter((item) => item.kind === 'name').map((item) => item.value);
-  const orderedNames = filenameList.length ? filenameList : nameList;
+  let orderedNames = filenameList.length ? filenameList : nameList;
+  if (!orderedNames.length) {
+    const filenameMatch = rawText.match(/filename=\"([\s\S]*?)\"/i);
+    if (filenameMatch?.[1]) {
+      const cleaned = filenameMatch[1].replace(/\r?\n[ \t]+/g, '');
+      const decoded = decodeHeaderParamValue(cleaned);
+      if (decoded) orderedNames = [decoded];
+    }
+  }
   const encodedNames = extractEncodedWordFilenames(rawText);
   const rawNames = extractHeaderFilenamesFromRaw(rawText);
   const combinedNames = Array.from(new Set([...orderedNames, ...rawNames, ...encodedNames]));
