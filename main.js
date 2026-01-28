@@ -304,7 +304,36 @@ const decodeAttachmentName = (value) => {
     if (!/=\?[^?]+\?[bqBQ]\?/.test(decoded)) break;
     decoded = decodeMimeWords(decoded).trim();
   }
-  return decoded.replace(/\s{2,}/g, ' ');
+  decoded = decoded.replace(/\s{2,}/g, ' ');
+  return repairMojibake(decoded);
+};
+
+const scoreDecodedText = (value) => {
+  const replacements = (value.match(/�/g) || []).length;
+  const hangul = (value.match(/[가-힣]/g) || []).length;
+  return { replacements, hangul };
+};
+
+const repairMojibake = (value) => {
+  if (!value) return '';
+  const suspicious = /�|Ã.|Â.|â|ê|ë|ì|í|ï/.test(value);
+  if (!suspicious) return value;
+  const bytes = latin1ToBytes(value);
+  const candidates = [value, decodeBytes(bytes, 'utf-8'), decodeBytes(bytes, 'euc-kr')].filter(Boolean);
+  let best = candidates[0];
+  let bestScore = scoreDecodedText(best);
+  for (let i = 1; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    const score = scoreDecodedText(candidate);
+    if (
+      score.replacements < bestScore.replacements ||
+      (score.replacements === bestScore.replacements && score.hangul > bestScore.hangul)
+    ) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
 };
 
 const parseHeaderParams = (value) => {
