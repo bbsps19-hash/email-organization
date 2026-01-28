@@ -1,0 +1,7 @@
+# Logs
+*.log
+firebase-debug.log
+gemini-server.log
+
+# OS
+.DS_Store
