@@ -7,22 +7,44 @@ const normalizeText = (value) => {
     .trim();
 };
 
+const STOPWORDS = new Set([
+  '관련',
+  '요청',
+  '목록',
+  '리스트',
+  '리스트업',
+  '리스트업해줘',
+  '해줘',
+  '해주세요',
+  '부탁',
+  'please',
+  'list',
+]);
+
 const extractTerms = (text) => {
   const normalized = normalizeText(text);
   if (!normalized) return [];
   const chunks = normalized.split(/[,\n]/).flatMap((part) => part.split(/\s+/));
-  return Array.from(new Set(chunks.filter(Boolean)));
+  return Array.from(
+    new Set(
+      chunks
+        .map((term) => term.replace(/[^\p{L}\p{N}&.\-]/gu, ''))
+        .filter((term) => term && term.length >= 2 && !STOPWORDS.has(term))
+    )
+  );
 };
 
-const matchesTerms = (haystack, terms) => {
+const matchesTerms = (haystack, terms, minHits = 1) => {
   if (!terms.length) return true;
   const hits = terms.filter((term) => haystack.includes(term));
-  if (terms.length <= 3) return hits.length === terms.length;
-  return hits.length >= 2;
+  return hits.length >= minHits;
 };
 
 const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
-  const terms = Array.from(new Set([...extractTerms(prompt), ...keywords.map(normalizeText)].filter(Boolean)));
+  const keywordTerms = keywords.map(normalizeText).filter(Boolean);
+  const promptTerms = extractTerms(prompt);
+  const terms = Array.from(new Set([...promptTerms, ...keywordTerms]));
+  const minHits = keywordTerms.length ? Math.min(2, keywordTerms.length) : 1;
   return emails.filter((email) => {
     const haystack = normalizeText(
       [
@@ -35,7 +57,7 @@ const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
         Array.isArray(email.attachments) ? email.attachments.join(' ') : '',
       ].join(' ')
     );
-    return matchesTerms(haystack, terms);
+    return matchesTerms(haystack, terms, minHits);
   });
 };
 
