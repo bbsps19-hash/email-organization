@@ -960,13 +960,33 @@ const extractFilenameFromHeaders = (headers) => {
   const type = headers['content-type'] || '';
   const dispositionParams = parseHeaderParams(disposition).params;
   const typeParams = parseHeaderParams(type).params;
+  const cleanParamValue = (value) => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    const separators = [
+      /,\s*filename\*=/i,
+      /,\s*filename=/i,
+      /;\s*filename\*=/i,
+      /;\s*filename=/i,
+      /,\s*name\*=/i,
+      /,\s*name=/i,
+      /;\s*name\*=/i,
+      /;\s*name=/i,
+    ];
+    let cleaned = trimmed;
+    separators.forEach((regex) => {
+      const idx = cleaned.search(regex);
+      if (idx !== -1) cleaned = cleaned.slice(0, idx).trim();
+    });
+    return cleaned;
+  };
   const raw =
     dispositionParams['filename*'] ||
     dispositionParams.filename ||
     typeParams['name*'] ||
     typeParams.name;
   if (!raw) return '';
-  return decodeMimeWords(decodeRfc2231(raw)).trim();
+  return decodeMimeWords(decodeRfc2231(cleanParamValue(raw))).trim();
 };
 
 const extractAttachments = (text) => {
