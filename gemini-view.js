@@ -116,10 +116,28 @@ const loadGeminiData = () => {
     const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
     const params = new URLSearchParams(window.location.search);
     const paramRule = params.get('rule') || '';
+    const normalizedRule = paramRule.trim();
     if (!raw) {
-      return { matches: [], prompt: paramRule, reply: '', keywords: [], emails: [] };
+      return {
+        matches: [],
+        prompt: normalizedRule,
+        reply: '',
+        keywords: [],
+        emails: [],
+        status: normalizedRule ? 'pending' : 'done',
+      };
     }
     const gemini = JSON.parse(raw);
+    if (normalizedRule && gemini.prompt && gemini.prompt.trim() !== normalizedRule) {
+      return {
+        matches: [],
+        prompt: normalizedRule,
+        reply: '',
+        keywords: [],
+        emails: [],
+        status: 'pending',
+      };
+    }
     const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : { emails: [] };
     const matches = Array.isArray(gemini.matches) ? gemini.matches : [];
     const emails = Array.isArray(snapshot.emails) ? snapshot.emails : [];
@@ -128,7 +146,7 @@ const loadGeminiData = () => {
       : emails.filter((email) => matches.includes(email.id));
     return {
       matches,
-      prompt: gemini.prompt || paramRule || '',
+      prompt: gemini.prompt || normalizedRule || '',
       reply: gemini.reply || '',
       keywords: Array.isArray(gemini.keywords) ? gemini.keywords : [],
       status: gemini.status || 'done',
