@@ -340,6 +340,8 @@ const decodeHeaderParamValue = (rawValue) => {
   const cleaned = rawValue.trim().replace(/(^\"|\"$)/g, '');
   const decodedRfc = decodeRfc2231(cleaned);
   const decoded = decodeMimeWords(decodedRfc).trim();
+  const repaired = repairMojibake(decoded);
+  if (repaired && repaired !== decoded) return repaired;
   if (!/�/.test(decoded)) return decoded;
   const bytes = windows1252ToBytes(cleaned);
   const candidates = [
