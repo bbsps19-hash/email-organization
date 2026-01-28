@@ -961,10 +961,10 @@ const extractFilenameFromHeaders = (headers) => {
   const dispositionParams = parseHeaderParams(disposition).params;
   const typeParams = parseHeaderParams(type).params;
   const raw =
-    dispositionParams.filename ||
     dispositionParams['filename*'] ||
-    typeParams.name ||
-    typeParams['name*'];
+    dispositionParams.filename ||
+    typeParams['name*'] ||
+    typeParams.name;
   if (!raw) return '';
   return decodeMimeWords(decodeRfc2231(raw)).trim();
 };
