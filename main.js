@@ -1250,8 +1250,22 @@ const parseEml = (buffer) => {
   const snippet = body.slice(0, 200);
   const attachments = attachmentsData.map((item) => decodeAttachmentName(item.name));
   const category = classify(subject, body, attachments);
+  const hasTruncatedAttachment = attachmentsData.some(
+    (item) => typeof item.name === 'string' && item.name.trim().endsWith('-')
+  );
 
-  return { subject, from, to, date, body, snippet, attachments, attachmentsData, category };
+  return {
+    subject,
+    from,
+    to,
+    date,
+    body,
+    snippet,
+    attachments,
+    attachmentsData,
+    category,
+    rawText: hasTruncatedAttachment ? rawText : null,
+  };
 };
 
 const getActiveFields = () => {
