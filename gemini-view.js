@@ -4,6 +4,8 @@ const pagination = document.getElementById('geminiPagination');
 const summary = document.getElementById('geminiSummary');
 const userBubble = document.getElementById('geminiUser');
 const assistantBubble = document.getElementById('geminiAssistant');
+const chatInput = document.getElementById('geminiChatInput');
+const chatSend = document.getElementById('geminiChatSend');
 const metaSubject = document.getElementById('geminiMetaSubject');
 const metaFrom = document.getElementById('geminiMetaFrom');
 const metaTo = document.getElementById('geminiMetaTo');
@@ -405,4 +407,60 @@ if (shouldRunGemini) {
         assistantBubble.textContent = t[lang].error;
       }
     });
+}
+
+const sendGeminiChat = async () => {
+  if (!chatInput) return;
+  const prompt = chatInput.value.trim();
+  if (!prompt) return;
+  userBubble.textContent = prompt;
+  assistantBubble.textContent = t[lang].running;
+  chatSend?.setAttribute('disabled', 'true');
+  chatInput.setAttribute('disabled', 'true');
+  const baseEmails = state.emails.length ? state.emails : (snapshot.emails || []);
+  try {
+    const data = await callGemini(prompt, baseEmails);
+    const ids = Array.isArray(data.matches) ? data.matches : [];
+    const keywords = Array.isArray(data.keywords) ? data.keywords : [];
+    let results = baseEmails.filter((email) => ids.includes(email.id));
+    if (!results.length && baseEmails.length) {
+      results = filterEmailsByCriteria(baseEmails, prompt, keywords).results;
+    }
+    const payload = {
+      prompt,
+      matches: ids,
+      keywords,
+      reply: data.reply || data.notes || t[lang].fallbackAssistant,
+      results,
+      status: 'done',
+      updatedAt: Date.now(),
+    };
+    localStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+    sessionStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+    renderAll(payload);
+  } catch (error) {
+    const message = String(error?.message || '');
+    if (message.includes('GEMINI_SETUP')) {
+      assistantBubble.textContent = t[lang].setupError;
+    } else if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
+      assistantBubble.textContent = t[lang].connectError;
+    } else {
+      assistantBubble.textContent = t[lang].error;
+    }
+  } finally {
+    chatSend?.removeAttribute('disabled');
+    chatInput.removeAttribute('disabled');
+    chatInput.value = '';
+    chatInput.focus();
+  }
+};
+
+if (chatSend && chatInput) {
+  chatSend.addEventListener('click', sendGeminiChat);
+  chatInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sendGeminiChat();
+    }
+  });
 }

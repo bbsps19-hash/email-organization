@@ -351,6 +351,22 @@ body {
   gap: 12px;
 }
 
+.gemini-chat-input {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.gemini-chat-input input {
+  flex: 1;
+  border-radius: 14px;
+  border: 2px solid var(--border);
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
 .chat-bubble {
   padding: 12px 14px;
   border-radius: 16px;
