@@ -465,10 +465,9 @@ const renderAll = (data) => {
   if (specQuery) specQuery.textContent = spec.query || '-';
   if (specTarget) specTarget.textContent = spec.out;
   const baseEmails = snapshot.emails || [];
-  const fallbackEmails = (!data.emails || !data.emails.length) && prompt
-    ? getLocalResults(baseEmails, prompt, data.keywords || [])
-    : [];
-  const resolvedEmails = (data.emails && data.emails.length) ? data.emails : fallbackEmails;
+  const resolvedEmails = (data.emails && data.emails.length)
+    ? data.emails
+    : (prompt ? getLocalResults(baseEmails, prompt, data.keywords || []) : baseEmails);
   if (specTotal) specTotal.textContent = `${baseEmails.length}개`;
   if (specCount) specCount.textContent = `${resolvedEmails.length}개`;
   if (prompt) {
@@ -480,7 +479,7 @@ const renderAll = (data) => {
   if (reply) {
     appendChatBubble('assistant', reply);
   } else if (prompt) {
-    appendChatBubble('assistant', lang === 'ko' ? `분류 기준: ${prompt}` : `Classification criteria: ${prompt}`);
+    appendChatBubble('assistant', lang === 'ko' ? `분류 기준: ${buildCriteriaText(prompt)}` : `Classification criteria: ${prompt}`);
   } else {
     appendChatBubble('assistant', t[lang].fallbackAssistant);
   }
@@ -501,6 +500,15 @@ const shouldRunGemini = baseData.prompt && (baseData.status === 'pending' || (ba
 if (shouldRunGemini) {
   appendChatBubble('assistant', t[lang].running);
   const previousEmails = state.emails.length ? state.emails : (baseData.emails || []);
+  if (previousEmails.length && baseData.prompt) {
+    const localResults = getLocalResults(previousEmails, baseData.prompt, []);
+    if (localResults.length) {
+      state.emails = localResults;
+      if (specCount) specCount.textContent = `${localResults.length}개`;
+      renderList(state.emails);
+      renderSummary(state.summaryId);
+    }
+  }
   callGemini(baseData.prompt, snapshot.emails || [])
     .then((data) => {
       const ids = Array.isArray(data.matches) ? data.matches : [];
@@ -568,6 +576,16 @@ const sendGeminiChat = async () => {
   chatSend?.setAttribute('disabled', 'true');
   chatInput.setAttribute('disabled', 'true');
   const baseEmails = state.emails.length ? state.emails : (snapshot.emails || []);
+  const localResults = getLocalResults(baseEmails, prompt, []);
+  if (localResults.length) {
+    state.emails = localResults;
+    if (specCount) specCount.textContent = `${localResults.length}개`;
+    summary.textContent = lang === 'ko'
+      ? `조건에 맞는 메일: ${localResults.length}개 (전체 ${baseEmails.length}개)`
+      : `Matched: ${localResults.length} (Total ${baseEmails.length})`;
+    renderList(state.emails);
+    renderSummary(state.summaryId);
+  }
   try {
     const data = await callGemini(prompt, baseEmails);
     const ids = Array.isArray(data.matches) ? data.matches : [];
