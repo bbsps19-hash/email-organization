@@ -143,6 +143,11 @@ const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
   return { results, terms };
 };
 
+const getLocalResults = (emails, prompt, keywords = []) => {
+  if (!emails.length || (!prompt && !keywords.length)) return [];
+  return filterEmailsByCriteria(emails, prompt, keywords).results;
+};
+
 const formatSize = (size) => {
   const bytes = Number(size);
   if (!Number.isFinite(bytes) || bytes <= 0) return '-';
@@ -390,16 +395,13 @@ if (shouldRunGemini) {
       const ids = Array.isArray(data.matches) ? data.matches : [];
       const keywords = Array.isArray(data.keywords) ? data.keywords : [];
       const baseEmails = snapshot.emails || [];
-      let results = baseEmails.filter((email) => ids.includes(email.id));
-      if (!results.length && baseEmails.length && (baseData.prompt || keywords.length)) {
-        results = filterEmailsByCriteria(baseEmails, baseData.prompt, keywords).results;
-      }
+      const geminiResults = baseEmails.filter((email) => ids.includes(email.id));
+      const localResults = getLocalResults(baseEmails, baseData.prompt, keywords);
+      let results = localResults.length ? localResults : geminiResults;
       if (!results.length && Array.isArray(baseData.emails) && baseData.emails.length) {
         results = baseData.emails;
       }
-      if (!results.length && previousEmails.length) {
-        results = previousEmails;
-      }
+      if (!results.length && previousEmails.length) results = previousEmails;
       const payload = {
         prompt: baseData.prompt,
         matches: ids,
@@ -438,10 +440,9 @@ const sendGeminiChat = async () => {
     const data = await callGemini(prompt, baseEmails);
     const ids = Array.isArray(data.matches) ? data.matches : [];
     const keywords = Array.isArray(data.keywords) ? data.keywords : [];
-    let results = baseEmails.filter((email) => ids.includes(email.id));
-    if (!results.length && baseEmails.length) {
-      results = filterEmailsByCriteria(baseEmails, prompt, keywords).results;
-    }
+    const geminiResults = baseEmails.filter((email) => ids.includes(email.id));
+    const localResults = getLocalResults(baseEmails, prompt, keywords);
+    const results = localResults.length ? localResults : geminiResults;
     const reply = data.reply || data.notes || (lang === 'ko'
       ? `분류 기준: ${prompt}`
       : `Classification criteria: ${prompt}`);
@@ -450,7 +451,7 @@ const sendGeminiChat = async () => {
       matches: ids,
       keywords,
       reply,
-      results: state.emails.length ? state.emails : (results.length ? results : baseEmails),
+      results,
       status: 'done',
       updatedAt: Date.now(),
     };
