@@ -257,7 +257,14 @@ const renderList = (emails) => {
     badge.className = 'file-badge';
     badge.textContent = categoryLabels[email.category] || 'Gemini';
 
-    li.append(title, meta, badge);
+    const status = document.createElement('span');
+    status.className = 'gemini-file-status';
+    status.textContent = email.id === state.summaryId
+      ? (lang === 'ko' ? '선택됨' : 'Selected')
+      : (lang === 'ko' ? '미선택' : 'Not selected');
+    if (email.id === state.summaryId) status.classList.add('is-active');
+
+    li.append(title, meta, badge, status);
     li.addEventListener('click', () => {
       state.summaryId = email.id;
       renderSummary(email.id);
