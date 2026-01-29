@@ -444,7 +444,7 @@ const buildReport = (spec, allEmails, matchedEmails) => {
   ];
   if (matchedEmails.length) {
     reportLines.push('', '메일 목록:');
-    matchedEmails.slice(0, 6).forEach((email, index) => {
+    matchedEmails.forEach((email, index) => {
       const sender = email.from || '-';
       const subject = email.subject || email.fileName || '-';
       const attachCount = email.attachments?.length || 0;
