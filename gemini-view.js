@@ -2,8 +2,7 @@ const list = document.getElementById('geminiList');
 const emptyView = document.getElementById('emptyGemini');
 const pagination = document.getElementById('geminiPagination');
 const summary = document.getElementById('geminiSummary');
-const userBubble = document.getElementById('geminiUser');
-const assistantBubble = document.getElementById('geminiAssistant');
+const chatLog = document.getElementById('geminiChatLog');
 const chatInput = document.getElementById('geminiChatInput');
 const chatSend = document.getElementById('geminiChatSend');
 const metaSubject = document.getElementById('geminiMetaSubject');
@@ -344,17 +343,30 @@ const callGemini = async (prompt, emails) => {
   return data;
 };
 
+const appendChatBubble = (role, text) => {
+  if (!chatLog) return;
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${role}`;
+  bubble.textContent = text || '-';
+  chatLog.appendChild(bubble);
+  chatLog.scrollTop = chatLog.scrollHeight;
+};
+
 const renderAll = (data) => {
   summary.textContent = t[lang].summary;
-  userBubble.textContent = data.prompt || t[lang].fallbackUser;
-  if (data.reply) {
-    assistantBubble.textContent = data.reply;
-  } else if (data.prompt) {
-    assistantBubble.textContent = lang === 'ko'
-      ? `분류 기준: ${data.prompt}`
-      : `Classification criteria: ${data.prompt}`;
+  if (chatLog) chatLog.innerHTML = '';
+  const prompt = data.prompt || '';
+  const reply = data.reply || '';
+  if (prompt) appendChatBubble('user', prompt);
+  if (reply) {
+    appendChatBubble('assistant', reply);
+  } else if (prompt) {
+    appendChatBubble(
+      'assistant',
+      lang === 'ko' ? `분류 기준: ${prompt}` : `Classification criteria: ${prompt}`
+    );
   } else {
-    assistantBubble.textContent = t[lang].fallbackAssistant;
+    appendChatBubble('assistant', t[lang].fallbackAssistant);
   }
   state.emails = data.emails || [];
   if (!state.emails.find((email) => email.id === state.summaryId)) {
@@ -371,7 +383,7 @@ renderAll(baseData);
 
 const shouldRunGemini = baseData.prompt && (baseData.status === 'pending' || (baseData.matches || []).length === 0);
 if (shouldRunGemini) {
-  assistantBubble.textContent = t[lang].running;
+  appendChatBubble('assistant', t[lang].running);
   const previousEmails = state.emails.length ? state.emails : (baseData.emails || []);
   callGemini(baseData.prompt, snapshot.emails || [])
     .then((data) => {
@@ -404,11 +416,11 @@ if (shouldRunGemini) {
     .catch((error) => {
       const message = String(error?.message || '');
       if (message.includes('GEMINI_SETUP')) {
-        assistantBubble.textContent = t[lang].setupError;
+        appendChatBubble('assistant', t[lang].setupError);
       } else if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-        assistantBubble.textContent = t[lang].connectError;
+        appendChatBubble('assistant', t[lang].connectError);
       } else {
-        assistantBubble.textContent = t[lang].error;
+        appendChatBubble('assistant', t[lang].error);
       }
     });
 }
@@ -417,8 +429,8 @@ const sendGeminiChat = async () => {
   if (!chatInput) return;
   const prompt = chatInput.value.trim();
   if (!prompt) return;
-  userBubble.textContent = prompt;
-  assistantBubble.textContent = t[lang].running;
+  appendChatBubble('user', prompt);
+  appendChatBubble('assistant', t[lang].running);
   chatSend?.setAttribute('disabled', 'true');
   chatInput.setAttribute('disabled', 'true');
   const baseEmails = state.emails.length ? state.emails : (snapshot.emails || []);
@@ -448,11 +460,11 @@ const sendGeminiChat = async () => {
   } catch (error) {
     const message = String(error?.message || '');
     if (message.includes('GEMINI_SETUP')) {
-      assistantBubble.textContent = t[lang].setupError;
+      appendChatBubble('assistant', t[lang].setupError);
     } else if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-      assistantBubble.textContent = t[lang].connectError;
+      appendChatBubble('assistant', t[lang].connectError);
     } else {
-      assistantBubble.textContent = t[lang].error;
+      appendChatBubble('assistant', t[lang].error);
     }
   } finally {
     chatSend?.removeAttribute('disabled');
