@@ -360,21 +360,6 @@ const appendChatBubble = (role, text) => {
   chatLog.scrollTop = chatLog.scrollHeight;
 };
 
-const appendChatBlock = (title, body) => {
-  if (!chatLog) return;
-  const wrap = document.createElement('div');
-  wrap.className = 'chat-block';
-  const heading = document.createElement('div');
-  heading.className = 'chat-block-title';
-  heading.textContent = title;
-  const pre = document.createElement('pre');
-  pre.className = 'chat-block-body';
-  pre.textContent = body;
-  wrap.append(heading, pre);
-  chatLog.appendChild(wrap);
-  chatLog.scrollTop = chatLog.scrollHeight;
-};
-
 const parseSpecInput = (input) => {
   const parts = input.split('/').map((part) => part.trim()).filter(Boolean);
   if (parts.length >= 3) {
@@ -400,49 +385,13 @@ const countAttachments = (emails) =>
   emails.reduce((sum, email) => sum + (email.attachments?.length || 0), 0);
 
 const buildReport = (spec, allEmails, matchedEmails) => {
-  const parsed = parseQueryFields(spec.query);
   const summaryData = {
     scanned: allEmails.length,
     matched: matchedEmails.length,
-    copied: 0,
-    field_hits_ref: {
-      sender: allEmails.length,
-      subject: allEmails.length,
-      body: allEmails.length,
-      attach: matchedEmails.length,
-    },
-    errors: 0,
+    totalAttachments: countAttachments(matchedEmails),
   };
-  const matchedSample = matchedEmails.slice(0, 3).map((email) => ({
-    path: email.fileName || '-',
-    from: email.from || '-',
-    subject: email.subject || '-',
-    attachments: email.attachments || [],
-  }));
-  const toolRequest = [
-    'Epik_eml요청{',
-    `  \`spec\`: \`${spec.folder}/${spec.query}/${spec.out}\`,`,
-    '  `dry_run`: true',
-    '}',
-  ].join('\n');
-  const toolResponse = JSON.stringify(
-    {
-      input: {
-        mail_folder: spec.folder,
-        out_folder: spec.out,
-        query: spec.query,
-        parsed,
-        dry_run: true,
-      },
-      summary: summaryData,
-      matched_sample: matchedSample,
-      errors_sample: [],
-    },
-    null,
-    2
-  );
   const reportLines = [
-    `${spec.query} 조건으로 메일을 찾았습니다.`,
+    `분류 기준: ${spec.query}`,
     '',
     `총 스캔한 메일: ${summaryData.scanned}개`,
     `조건에 맞는 메일: ${summaryData.matched}개`,
@@ -457,12 +406,8 @@ const buildReport = (spec, allEmails, matchedEmails) => {
       reportLines.push(`- ${sender} - ${subject} (첨부파일 ${attachCount}개)`);
     });
   }
-  reportLines.push('', `총 첨부파일: ${countAttachments(matchedEmails)}개`);
-  return {
-    toolRequest,
-    toolResponse,
-    assistantText: reportLines.join('\n'),
-  };
+  reportLines.push('', `총 첨부파일: ${summaryData.totalAttachments}개`);
+  return reportLines.join('\n');
 };
 
 const renderAll = (data) => {
@@ -511,11 +456,13 @@ if (shouldRunGemini) {
         results = baseData.emails;
       }
       if (!results.length && previousEmails.length) results = previousEmails;
+      const spec = parseSpecInput(baseData.prompt);
+      const reply = buildReport(spec, baseEmails, results);
       const payload = {
         prompt: baseData.prompt,
         matches: ids,
         keywords,
-        reply: data.reply || data.notes || t[lang].fallbackAssistant,
+        reply,
         results,
         status: 'done',
         updatedAt: Date.now(),
@@ -553,11 +500,8 @@ const sendGeminiChat = async () => {
     const localResults = getLocalResults(baseEmails, prompt, keywords);
     const results = localResults.length ? localResults : geminiResults;
     const spec = parseSpecInput(prompt);
-    const report = buildReport(spec, baseEmails, results);
-    appendChatBlock('Epik_eml요청', report.toolRequest);
-    appendChatBlock('응답', report.toolResponse);
-    appendChatBubble('assistant', report.assistantText);
-    const reply = report.assistantText;
+    const reply = buildReport(spec, baseEmails, results);
+    appendChatBubble('assistant', reply);
     const payload = {
       prompt,
       matches: ids,
