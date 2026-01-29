@@ -49,7 +49,7 @@ const categoryLabels = {
 
 const state = {
   page: 1,
-  pageSize: 100,
+  pageSize: 10,
   summaryId: null,
   emails: [],
 };
@@ -444,7 +444,7 @@ const buildReport = (spec, allEmails, matchedEmails) => {
   ];
   if (matchedEmails.length) {
     reportLines.push('', '메일 목록:');
-    matchedEmails.slice(0, 10).forEach((email, index) => {
+    matchedEmails.forEach((email, index) => {
       const sender = email.from || '-';
       const subject = email.subject || email.fileName || '-';
       const attachCount = email.attachments?.length || 0;

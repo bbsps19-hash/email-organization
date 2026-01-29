@@ -35,7 +35,7 @@ const t = {
 
 const state = {
   page: 1,
-  pageSize: 20,
+  pageSize: 10,
   summaryId: null,
 };
 
