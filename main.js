@@ -7,9 +7,6 @@ const langButtons = document.querySelectorAll('.lang-btn');
 
 const filterPanel = document.getElementById('filterPanel');
 const resultButton = document.getElementById('resultButton');
-const geminiResponse = document.getElementById('geminiResponse');
-const geminiResponseText = document.getElementById('geminiResponseText');
-const geminiKeywords = document.getElementById('geminiKeywords');
 const fieldCheckboxes = document.querySelectorAll('.field-checkbox');
 const pagination = document.getElementById('pagination');
 const tabButtons = document.querySelectorAll('.tab-button');
@@ -104,8 +101,6 @@ const translations = {
     geminiSetup: 'Gemini API 키가 필요합니다. Cloudflare Pages 환경 변수(GEMINI_API_KEY)를 설정하세요.',
     geminiStored: '이전에 실행한 Gemini 결과가 있습니다.',
     geminiDefaultReply: '분류 기준을 바탕으로 결과를 정리했습니다.',
-    geminiResponseLabel: 'Gemini 답변',
-    geminiKeywordsLabel: 'Gemini 키워드',
     geminiRuleRequired: '분류 기준을 입력하세요.',
     fieldSubject: '제목',
     fieldBody: '본문',
@@ -170,8 +165,6 @@ const translations = {
     geminiSetup: 'Gemini API key is required. Set GEMINI_API_KEY in Cloudflare Pages.',
     geminiStored: 'Saved Gemini results are available.',
     geminiDefaultReply: 'Results are organized based on your criteria.',
-    geminiResponseLabel: 'Gemini Response',
-    geminiKeywordsLabel: 'Gemini Keywords',
     geminiRuleRequired: 'Please enter a classification rule.',
     fieldSubject: 'Subject',
     fieldBody: 'Body',
@@ -662,12 +655,6 @@ const applyTranslations = () => {
   if (resultButton) {
     resultButton.disabled = state.mode === 'gemini' && !state.geminiRule.trim();
   }
-  if (geminiResponseText) {
-    geminiResponseText.textContent = t.geminiDefaultReply;
-  }
-  if (geminiKeywords) {
-    geminiKeywords.textContent = '-';
-  }
 
   langButtons.forEach((button) => {
     button.classList.toggle('is-active', button.dataset.lang === state.lang);
@@ -693,25 +680,6 @@ const setGeminiStatus = (message) => {
   status.textContent = message || '';
 };
 
-const setGeminiResponse = (message) => {
-  if (!geminiResponse || !geminiResponseText) return;
-  if (!message) {
-    geminiResponse.hidden = true;
-    return;
-  }
-  geminiResponse.hidden = false;
-  geminiResponseText.textContent = message;
-};
-
-const setGeminiKeywords = (keywords) => {
-  if (!geminiKeywords) return;
-  if (!Array.isArray(keywords) || !keywords.length) {
-    geminiKeywords.textContent = '-';
-    return;
-  }
-  geminiKeywords.textContent = keywords.join(', ');
-};
-
 const setGeminiStatusFromStorage = () => {
   const status = document.getElementById('geminiStatus');
   if (!status) return;
@@ -726,12 +694,7 @@ const setGeminiStatusFromStorage = () => {
     const message = t.geminiSuccess(data.matches.length);
     const base = timestamp ? `${message} (${timestamp})` : message;
     status.textContent = `${base} · ${t.geminiStored}`;
-    if (data.reply) {
-      setGeminiResponse(data.reply);
-    }
-    if (data.keywords) {
-      setGeminiKeywords(data.keywords);
-    }
+    // Gemini response/keywords panel removed from UI.
   } catch (error) {
     // Ignore storage errors.
   }
@@ -809,7 +772,7 @@ const renderFilterPanel = () => {
       checkButton.addEventListener('click', checkGeminiServer);
     }
     setGeminiStatusFromStorage();
-    setGeminiResponse(t.geminiDefaultReply);
+    // Gemini response panel removed.
   }
 };
 
@@ -832,7 +795,7 @@ const runGeminiClassification = async () => {
     return;
   }
   setGeminiStatus(t.geminiRunning);
-  setGeminiResponse(t.geminiDefaultReply);
+  // Gemini response panel removed.
   try {
     const seed = JSON.stringify({
       prompt: state.geminiRule.trim(),
@@ -915,8 +878,7 @@ const runGeminiClassification = async () => {
       // Ignore storage errors.
     }
     setGeminiStatus(t.geminiSuccess(ids.length));
-    setGeminiResponse(reply);
-    setGeminiKeywords(keywords);
+    // Gemini response/keywords panel removed.
     persistSnapshots();
   } catch (error) {
     const message = String(error?.message || '');
@@ -927,7 +889,7 @@ const runGeminiClassification = async () => {
     } else {
       setGeminiStatus(t.geminiError);
     }
-    setGeminiResponse(t.geminiDefaultReply);
+    // Gemini response panel removed.
   } finally {
     clearTimeout(timeout);
   }
