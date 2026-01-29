@@ -5,6 +5,9 @@ const summary = document.getElementById('geminiSummary');
 const chatLog = document.getElementById('geminiChatLog');
 const chatInput = document.getElementById('geminiChatInput');
 const chatSend = document.getElementById('geminiChatSend');
+const specSource = document.getElementById('geminiSpecSource');
+const specQuery = document.getElementById('geminiSpecQuery');
+const specTarget = document.getElementById('geminiSpecTarget');
 const metaSubject = document.getElementById('geminiMetaSubject');
 const metaFrom = document.getElementById('geminiMetaFrom');
 const metaTo = document.getElementById('geminiMetaTo');
@@ -357,19 +360,125 @@ const appendChatBubble = (role, text) => {
   chatLog.scrollTop = chatLog.scrollHeight;
 };
 
+const appendChatBlock = (title, body) => {
+  if (!chatLog) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-block';
+  const heading = document.createElement('div');
+  heading.className = 'chat-block-title';
+  heading.textContent = title;
+  const pre = document.createElement('pre');
+  pre.className = 'chat-block-body';
+  pre.textContent = body;
+  wrap.append(heading, pre);
+  chatLog.appendChild(wrap);
+  chatLog.scrollTop = chatLog.scrollHeight;
+};
+
+const parseSpecInput = (input) => {
+  const parts = input.split('/').map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 3) {
+    return { folder: parts[0], query: parts.slice(1, -1).join(' / '), out: parts[parts.length - 1] };
+  }
+  return { folder: '업로드된 메일함', query: input, out: 'Gemini 결과함' };
+};
+
+const parseQueryFields = (query) => {
+  const result = { op: 'AND', sender: null, subject: null, body: null, attach: null };
+  const sender = query.match(/보낸사람\s*([^\s,]+)/);
+  const subject = query.match(/제목\s*([^\s,]+)/);
+  const body = query.match(/본문\s*([^\s,]+)/);
+  const attach = query.match(/첨부파일명\s*([^\s,]+)/);
+  if (sender) result.sender = [sender[1]];
+  if (subject) result.subject = [subject[1]];
+  if (body) result.body = [body[1]];
+  if (attach) result.attach = [attach[1]];
+  return result;
+};
+
+const countAttachments = (emails) =>
+  emails.reduce((sum, email) => sum + (email.attachments?.length || 0), 0);
+
+const buildReport = (spec, allEmails, matchedEmails) => {
+  const parsed = parseQueryFields(spec.query);
+  const summaryData = {
+    scanned: allEmails.length,
+    matched: matchedEmails.length,
+    copied: 0,
+    field_hits_ref: {
+      sender: allEmails.length,
+      subject: allEmails.length,
+      body: allEmails.length,
+      attach: matchedEmails.length,
+    },
+    errors: 0,
+  };
+  const matchedSample = matchedEmails.slice(0, 3).map((email) => ({
+    path: email.fileName || '-',
+    from: email.from || '-',
+    subject: email.subject || '-',
+    attachments: email.attachments || [],
+  }));
+  const toolRequest = [
+    'Epik_eml요청{',
+    `  \`spec\`: \`${spec.folder}/${spec.query}/${spec.out}\`,`,
+    '  `dry_run`: true',
+    '}',
+  ].join('\n');
+  const toolResponse = JSON.stringify(
+    {
+      input: {
+        mail_folder: spec.folder,
+        out_folder: spec.out,
+        query: spec.query,
+        parsed,
+        dry_run: true,
+      },
+      summary: summaryData,
+      matched_sample: matchedSample,
+      errors_sample: [],
+    },
+    null,
+    2
+  );
+  const reportLines = [
+    `${spec.query} 조건으로 메일을 찾았습니다.`,
+    '',
+    `총 스캔한 메일: ${summaryData.scanned}개`,
+    `조건에 맞는 메일: ${summaryData.matched}개`,
+    matchedEmails.length ? '' : '조건에 맞는 메일이 없습니다.',
+  ];
+  if (matchedEmails.length) {
+    reportLines.push('', '메일 목록:');
+    matchedEmails.slice(0, 6).forEach((email) => {
+      const sender = email.from || '-';
+      const subject = email.subject || email.fileName || '-';
+      const attachCount = email.attachments?.length || 0;
+      reportLines.push(`- ${sender} - ${subject} (첨부파일 ${attachCount}개)`);
+    });
+  }
+  reportLines.push('', `총 첨부파일: ${countAttachments(matchedEmails)}개`);
+  return {
+    toolRequest,
+    toolResponse,
+    assistantText: reportLines.join('\n'),
+  };
+};
+
 const renderAll = (data) => {
   summary.textContent = t[lang].summary;
   if (chatLog) chatLog.innerHTML = '';
   const prompt = data.prompt || '';
   const reply = data.reply || '';
+  const spec = parseSpecInput(prompt || t[lang].fallbackUser);
+  if (specSource) specSource.textContent = spec.folder;
+  if (specQuery) specQuery.textContent = spec.query || '-';
+  if (specTarget) specTarget.textContent = spec.out;
   if (prompt) appendChatBubble('user', prompt);
   if (reply) {
     appendChatBubble('assistant', reply);
   } else if (prompt) {
-    appendChatBubble(
-      'assistant',
-      lang === 'ko' ? `분류 기준: ${prompt}` : `Classification criteria: ${prompt}`
-    );
+    appendChatBubble('assistant', lang === 'ko' ? `분류 기준: ${prompt}` : `Classification criteria: ${prompt}`);
   } else {
     appendChatBubble('assistant', t[lang].fallbackAssistant);
   }
@@ -443,9 +552,12 @@ const sendGeminiChat = async () => {
     const geminiResults = baseEmails.filter((email) => ids.includes(email.id));
     const localResults = getLocalResults(baseEmails, prompt, keywords);
     const results = localResults.length ? localResults : geminiResults;
-    const reply = data.reply || data.notes || (lang === 'ko'
-      ? `분류 기준: ${prompt}`
-      : `Classification criteria: ${prompt}`);
+    const spec = parseSpecInput(prompt);
+    const report = buildReport(spec, baseEmails, results);
+    appendChatBlock('Epik_eml요청', report.toolRequest);
+    appendChatBlock('응답', report.toolResponse);
+    appendChatBubble('assistant', report.assistantText);
+    const reply = report.assistantText;
     const payload = {
       prompt,
       matches: ids,
