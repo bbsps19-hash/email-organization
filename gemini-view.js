@@ -529,6 +529,25 @@ if (shouldRunGemini) {
       renderAll(payload);
     })
     .catch((error) => {
+      const baseEmails = snapshot.emails || [];
+      const fallbackResults = getLocalResults(baseEmails, baseData.prompt, []);
+      if (fallbackResults.length) {
+        const spec = parseSpecInput(baseData.prompt);
+        const reply = buildReport(spec, baseEmails, fallbackResults);
+        const payload = {
+          prompt: baseData.prompt,
+          matches: [],
+          keywords: [],
+          reply,
+          results: fallbackResults,
+          status: 'done',
+          updatedAt: Date.now(),
+        };
+        localStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+        sessionStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+        renderAll(payload);
+        return;
+      }
       const message = String(error?.message || '');
       if (message.includes('GEMINI_SETUP')) {
         appendChatBubble('assistant', t[lang].setupError);
@@ -572,6 +591,25 @@ const sendGeminiChat = async () => {
     sessionStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
     renderAll(payload);
   } catch (error) {
+    const fallbackResults = getLocalResults(baseEmails, prompt, []);
+    if (fallbackResults.length) {
+      const spec = parseSpecInput(prompt);
+      const reply = buildReport(spec, baseEmails, fallbackResults);
+      appendChatBubble('assistant', reply);
+      const payload = {
+        prompt,
+        matches: [],
+        keywords: [],
+        reply,
+        results: fallbackResults,
+        status: 'done',
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+      sessionStorage.setItem('emailOrganizerGeminiPayload', JSON.stringify(payload));
+      renderAll(payload);
+      return;
+    }
     const message = String(error?.message || '');
     if (message.includes('GEMINI_SETUP')) {
       appendChatBubble('assistant', t[lang].setupError);
