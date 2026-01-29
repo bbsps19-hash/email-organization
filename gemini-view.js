@@ -8,6 +8,8 @@ const chatSend = document.getElementById('geminiChatSend');
 const specSource = document.getElementById('geminiSpecSource');
 const specQuery = document.getElementById('geminiSpecQuery');
 const specTarget = document.getElementById('geminiSpecTarget');
+const specTotal = document.getElementById('geminiSpecTotal');
+const specCount = document.getElementById('geminiSpecCount');
 const metaSubject = document.getElementById('geminiMetaSubject');
 const metaFrom = document.getElementById('geminiMetaFrom');
 const metaTo = document.getElementById('geminiMetaTo');
@@ -432,6 +434,18 @@ const renderAll = (data) => {
   if (specSource) specSource.textContent = spec.folder;
   if (specQuery) specQuery.textContent = spec.query || '-';
   if (specTarget) specTarget.textContent = spec.out;
+  const baseEmails = snapshot.emails || [];
+  const fallbackEmails = (!data.emails || !data.emails.length) && prompt
+    ? getLocalResults(baseEmails, prompt, data.keywords || [])
+    : [];
+  const resolvedEmails = (data.emails && data.emails.length) ? data.emails : fallbackEmails;
+  if (specTotal) specTotal.textContent = `${baseEmails.length}개`;
+  if (specCount) specCount.textContent = `${resolvedEmails.length}개`;
+  if (prompt) {
+    summary.textContent = lang === 'ko'
+      ? `조건에 맞는 메일: ${resolvedEmails.length}개 (전체 ${baseEmails.length}개)`
+      : `Matched: ${resolvedEmails.length} (Total ${baseEmails.length})`;
+  }
   if (prompt) appendChatBubble('user', prompt);
   if (reply) {
     appendChatBubble('assistant', reply);
@@ -440,7 +454,7 @@ const renderAll = (data) => {
   } else {
     appendChatBubble('assistant', t[lang].fallbackAssistant);
   }
-  state.emails = data.emails || [];
+  state.emails = resolvedEmails;
   if (!state.emails.find((email) => email.id === state.summaryId)) {
     state.summaryId = state.emails.length ? state.emails[0].id : null;
   }
