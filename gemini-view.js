@@ -80,6 +80,18 @@ const STOPWORDS = new Set([
   '부탁',
   'please',
   'list',
+  '첨부파일명',
+  '첨부',
+  '보낸사람',
+  '발신자',
+  '제목',
+  '본문',
+  'from',
+  'sender',
+  'subject',
+  'body',
+  'attachment',
+  'attachments',
 ]);
 
 const extractTerms = (text) => {
@@ -123,6 +135,7 @@ const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
   const keywordTerms = keywords.map(normalizeText).filter(Boolean);
   const promptTerms = extractTerms(prompt);
   const terms = Array.from(new Set([...promptTerms, ...keywordTerms]));
+  const parsed = parseQueryFields(prompt);
   const minHits = 1;
   const results = emails.filter((email) => {
     const haystack = normalizeText(
@@ -136,7 +149,24 @@ const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
         Array.isArray(email.attachments) ? email.attachments.join(' ') : '',
       ].join(' ')
     );
-    return matchesTerms(haystack, terms, minHits);
+    if (!matchesTerms(haystack, terms, minHits)) return false;
+    if (parsed.sender?.length) {
+      const from = normalizeText(email.from);
+      if (!parsed.sender.every((term) => from.includes(normalizeText(term)))) return false;
+    }
+    if (parsed.subject?.length) {
+      const subject = normalizeText(email.subject);
+      if (!parsed.subject.every((term) => subject.includes(normalizeText(term)))) return false;
+    }
+    if (parsed.body?.length) {
+      const body = normalizeText(email.body);
+      if (!parsed.body.every((term) => body.includes(normalizeText(term)))) return false;
+    }
+    if (parsed.attach?.length) {
+      const attach = normalizeText(Array.isArray(email.attachments) ? email.attachments.join(' ') : '');
+      if (!parsed.attach.every((term) => attach.includes(normalizeText(term)))) return false;
+    }
+    return true;
   });
   if (DEBUG) {
     console.log('[gemini][filter] prompt', prompt);
