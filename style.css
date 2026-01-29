@@ -231,7 +231,8 @@ body {
   top: 74px;
   left: 34%;
   --rot: 0deg;
-  --env-filter: drop-shadow(10px 10px 0 rgba(0, 0, 0, 0.12)) saturate(1.05) brightness(1.06);
+  background-image: url('/envelope_icon_ref_exact_v2_red.png');
+  --env-filter: drop-shadow(10px 10px 0 rgba(0, 0, 0, 0.12));
   animation-delay: 0.9s;
   z-index: 4;
 }
