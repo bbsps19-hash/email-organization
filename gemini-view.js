@@ -20,7 +20,7 @@ const t = {
     empty: '표시할 메일이 없습니다.',
     summary: '요청한 기준에 맞는 메일을 모두 표시합니다.',
     fallbackUser: '요청한 기준이 없습니다.',
-    fallbackAssistant: '알겠어요! 기준에 맞는 메일을 골라볼게요.',
+    fallbackAssistant: '분류 기준을 바탕으로 결과를 정리했습니다.',
     running: '잠시만요, 기준에 맞는 메일을 찾고 있어요.',
     error: 'Gemini 분류에 실패했습니다.',
     connectError: 'Gemini API에 연결할 수 없습니다. Cloudflare Pages 환경 변수(GEMINI_API_KEY)를 확인하세요.',
@@ -30,7 +30,7 @@ const t = {
     empty: 'No emails to display.',
     summary: 'Showing all emails that match your criteria.',
     fallbackUser: 'No criteria provided.',
-    fallbackAssistant: 'Got it! I will find emails that match your criteria.',
+    fallbackAssistant: 'Results are organized based on your criteria.',
     running: 'Hang tight—finding emails that match your criteria.',
     error: 'Gemini classification failed.',
     connectError: 'Cannot reach the Gemini API. Check the Cloudflare Pages GEMINI_API_KEY setting.',
@@ -351,8 +351,8 @@ const renderAll = (data) => {
     assistantBubble.textContent = data.reply;
   } else if (data.prompt) {
     assistantBubble.textContent = lang === 'ko'
-      ? `${data.prompt} 관련 메일은 다음과 같습니다.`
-      : `Here are emails related to: ${data.prompt}.`;
+      ? `분류 기준: ${data.prompt}`
+      : `Classification criteria: ${data.prompt}`;
   } else {
     assistantBubble.textContent = t[lang].fallbackAssistant;
   }
@@ -372,6 +372,7 @@ renderAll(baseData);
 const shouldRunGemini = baseData.prompt && (baseData.status === 'pending' || (baseData.matches || []).length === 0);
 if (shouldRunGemini) {
   assistantBubble.textContent = t[lang].running;
+  const previousEmails = state.emails.length ? state.emails : (baseData.emails || []);
   callGemini(baseData.prompt, snapshot.emails || [])
     .then((data) => {
       const ids = Array.isArray(data.matches) ? data.matches : [];
@@ -383,6 +384,9 @@ if (shouldRunGemini) {
       }
       if (!results.length && Array.isArray(baseData.emails) && baseData.emails.length) {
         results = baseData.emails;
+      }
+      if (!results.length && previousEmails.length) {
+        results = previousEmails;
       }
       const payload = {
         prompt: baseData.prompt,
@@ -426,12 +430,15 @@ const sendGeminiChat = async () => {
     if (!results.length && baseEmails.length) {
       results = filterEmailsByCriteria(baseEmails, prompt, keywords).results;
     }
+    const reply = data.reply || data.notes || (lang === 'ko'
+      ? `분류 기준: ${prompt}`
+      : `Classification criteria: ${prompt}`);
     const payload = {
       prompt,
       matches: ids,
       keywords,
-      reply: data.reply || data.notes || t[lang].fallbackAssistant,
-      results,
+      reply,
+      results: state.emails.length ? state.emails : (results.length ? results : baseEmails),
       status: 'done',
       updatedAt: Date.now(),
     };
