@@ -384,6 +384,19 @@ const parseQueryFields = (query) => {
 const countAttachments = (emails) =>
   emails.reduce((sum, email) => sum + (email.attachments?.length || 0), 0);
 
+const buildCriteriaText = (query) => {
+  const parsed = parseQueryFields(query);
+  const terms = extractTerms(query);
+  const parts = [];
+  if (parsed.sender?.length) parts.push(`보낸사람: ${parsed.sender.join(', ')}`);
+  if (parsed.subject?.length) parts.push(`제목: ${parsed.subject.join(', ')}`);
+  if (parsed.body?.length) parts.push(`본문: ${parsed.body.join(', ')}`);
+  if (parsed.attach?.length) parts.push(`첨부파일명: ${parsed.attach.join(', ')}`);
+  if (!parts.length && terms.length) parts.push(`키워드: ${terms.join(', ')}`);
+  if (!parts.length) parts.push('키워드: (없음)');
+  return parts.join(' · ');
+};
+
 const buildReport = (spec, allEmails, matchedEmails) => {
   const summaryData = {
     scanned: allEmails.length,
@@ -391,7 +404,7 @@ const buildReport = (spec, allEmails, matchedEmails) => {
     totalAttachments: countAttachments(matchedEmails),
   };
   const reportLines = [
-    `분류 기준: ${spec.query}`,
+    `분류 기준: ${buildCriteriaText(spec.query)}`,
     '',
     `총 스캔한 메일: ${summaryData.scanned}개`,
     `조건에 맞는 메일: ${summaryData.matched}개`,
