@@ -444,14 +444,19 @@ const buildReport = (spec, allEmails, matchedEmails) => {
   ];
   if (matchedEmails.length) {
     reportLines.push('', '메일 목록:');
-    matchedEmails.slice(0, 6).forEach((email) => {
+    matchedEmails.slice(0, 6).forEach((email, index) => {
       const sender = email.from || '-';
       const subject = email.subject || email.fileName || '-';
       const attachCount = email.attachments?.length || 0;
-      reportLines.push(`- ${sender} - ${subject} (첨부파일 ${attachCount}개)`);
+      reportLines.push(
+        `${index + 1}. 보낸사람: ${sender}`,
+        `   제목: ${subject}`,
+        `   첨부파일: ${attachCount}개`,
+        ''
+      );
     });
   }
-  reportLines.push('', `총 첨부파일: ${summaryData.totalAttachments}개`);
+  reportLines.push(`총 첨부파일: ${summaryData.totalAttachments}개`);
   return reportLines.join('\n');
 };
 
