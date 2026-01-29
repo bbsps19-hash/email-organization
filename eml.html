@@ -18,9 +18,31 @@
     </header>
 
     <section class="upload-card">
+      <div class="gemini-spec">
+        <div>
+          <span class="gemini-spec-label">업로드함</span>
+          <strong>업로드된 메일함</strong>
+        </div>
+        <div>
+          <span class="gemini-spec-label">업로드 개수</span>
+          <strong id="emlSpecTotal">0개</strong>
+        </div>
+        <div>
+          <span class="gemini-spec-label">분류 기준</span>
+          <strong id="emlSpecQuery">-</strong>
+        </div>
+        <div>
+          <span class="gemini-spec-label">결과함</span>
+          <strong>검색 결과함</strong>
+        </div>
+        <div>
+          <span class="gemini-spec-label">결과 개수</span>
+          <strong id="emlSpecCount">0개</strong>
+        </div>
+      </div>
       <div class="file-list">
         <p class="file-empty" id="emptyView">표시할 메일이 없습니다.</p>
-        <ul id="emlList" hidden></ul>
+        <ul id="emlList" class="eml-file-list" hidden></ul>
       </div>
       <div class="pagination" id="emlPagination" hidden></div>
     </section>

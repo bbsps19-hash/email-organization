@@ -2,6 +2,9 @@ const list = document.getElementById('emlList');
 const emptyView = document.getElementById('emptyView');
 const filterInfo = document.getElementById('filterInfo');
 const pagination = document.getElementById('emlPagination');
+const specTotal = document.getElementById('emlSpecTotal');
+const specQuery = document.getElementById('emlSpecQuery');
+const specCount = document.getElementById('emlSpecCount');
 
 const lang = localStorage.getItem('emailOrganizerLang') || 'ko';
 const t = {
@@ -26,6 +29,7 @@ const t = {
 const state = {
   page: 1,
   pageSize: 20,
+  summaryId: null,
 };
 
 const categoryLabels = {
@@ -52,6 +56,10 @@ const renderList = (emails) => {
   list.hidden = false;
   paged.forEach((email) => {
     const li = document.createElement('li');
+    li.dataset.id = email.id;
+    if (email.id === state.summaryId) {
+      li.classList.add('is-active');
+    }
     const title = document.createElement('strong');
     title.textContent = email.subject || email.fileName;
 
@@ -72,6 +80,10 @@ const renderList = (emails) => {
     snippet.textContent = email.snippet || '-';
 
     li.append(title, meta, badge, snippet);
+    li.addEventListener('click', () => {
+      state.summaryId = email.id;
+      renderList(emails);
+    });
     list.appendChild(li);
   });
 
@@ -111,18 +123,34 @@ const loadData = () => {
   }
 };
 
+const loadTotal = () => {
+  try {
+    const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
+    if (!snapshotRaw) return 0;
+    const parsed = JSON.parse(snapshotRaw);
+    return Array.isArray(parsed.emails) ? parsed.emails.length : 0;
+  } catch (error) {
+    return 0;
+  }
+};
+
 const { emails, filters } = loadData();
+const totalCount = loadTotal();
+if (specTotal) specTotal.textContent = `${totalCount}개`;
+if (specCount) specCount.textContent = `${emails.length}개`;
 if (filters) {
   const parts = [];
   if (filters.mode === 'gemini') {
     parts.push(t[lang].modeGemini);
     if (filters.geminiPrompt) {
       parts.push(`${t[lang].criteria}: ${filters.geminiPrompt}`);
+      if (specQuery) specQuery.textContent = filters.geminiPrompt;
     }
   } else {
     parts.push(t[lang].modeSearch);
     if (filters.query) {
       parts.push(`${t[lang].query}: ${filters.query}`);
+      if (specQuery) specQuery.textContent = filters.query;
     }
   }
   filterInfo.textContent = parts.length ? `${parts.join(' / ')}` : t[lang].defaultInfo;
@@ -130,4 +158,5 @@ if (filters) {
   filterInfo.textContent = t[lang].defaultInfo;
 }
 
+if (emails.length) state.summaryId = emails[0]?.id ?? null;
 renderList(emails);

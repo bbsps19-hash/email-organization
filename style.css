@@ -648,7 +648,10 @@ body {
   gap: 6px;
 }
 
-#fileList li {
+#fileList li,
+#emlList li,
+.gemini-file-list li,
+.eml-file-list li {
   list-style: none;
   display: grid;
   gap: 6px;
@@ -661,14 +664,21 @@ body {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-#fileList li:hover {
+#fileList li:hover,
+#emlList li:hover,
+.gemini-file-list li:hover,
+.eml-file-list li:hover {
   transform: translateY(-1px);
   box-shadow: 8px 8px 0 var(--shadow);
 }
 
-#fileList li.is-active {
+#fileList li.is-active,
+#emlList li.is-active,
+.gemini-file-list li.is-active,
+.eml-file-list li.is-active {
   border-color: rgba(47, 92, 255, 0.8);
-  box-shadow: 10px 10px 0 rgba(47, 92, 255, 0.2);
+  background: rgba(47, 92, 255, 0.08);
+  box-shadow: none;
 }
 
 #fileList span {
