@@ -4,6 +4,13 @@ const pagination = document.getElementById('geminiPagination');
 const summary = document.getElementById('geminiSummary');
 const userBubble = document.getElementById('geminiUser');
 const assistantBubble = document.getElementById('geminiAssistant');
+const metaSubject = document.getElementById('geminiMetaSubject');
+const metaFrom = document.getElementById('geminiMetaFrom');
+const metaTo = document.getElementById('geminiMetaTo');
+const metaDate = document.getElementById('geminiMetaDate');
+const metaAttachments = document.getElementById('geminiMetaAttachments');
+const metaCategory = document.getElementById('geminiMetaCategory');
+const metaSnippet = document.getElementById('geminiMetaSnippet');
 
 const lang = localStorage.getItem('emailOrganizerLang') || 'ko';
 const t = {
@@ -37,6 +44,8 @@ const categoryLabels = {
 const state = {
   page: 1,
   pageSize: 100,
+  summaryId: null,
+  emails: [],
 };
 
 const DEBUG =
@@ -115,6 +124,41 @@ const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
   return { results, terms };
 };
 
+const formatSize = (size) => {
+  const bytes = Number(size);
+  if (!Number.isFinite(bytes) || bytes <= 0) return '-';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const display = value >= 100 ? Math.round(value) : value.toFixed(1);
+  return `${display} ${units[unitIndex]}`;
+};
+
+const renderSummary = (emailId) => {
+  const email = state.emails.find((item) => item.id === emailId);
+  if (!email) {
+    metaSubject.textContent = '-';
+    metaFrom.textContent = '-';
+    metaTo.textContent = '-';
+    metaDate.textContent = '-';
+    metaAttachments.textContent = '-';
+    metaCategory.textContent = '-';
+    metaSnippet.textContent = '-';
+    return;
+  }
+  metaSubject.textContent = email.subject || email.fileName || '-';
+  metaFrom.textContent = email.from || '-';
+  metaTo.textContent = email.to || '-';
+  metaDate.textContent = email.date || '-';
+  metaAttachments.textContent = email.attachments?.length ? email.attachments.join(', ') : '-';
+  metaCategory.textContent = categoryLabels[email.category] || 'Gemini';
+  metaSnippet.textContent = email.snippet || '-';
+};
+
 const renderList = (emails) => {
   list.innerHTML = '';
   const totalPages = Math.max(1, Math.ceil(emails.length / state.pageSize));
@@ -127,6 +171,7 @@ const renderList = (emails) => {
     list.hidden = true;
     pagination.hidden = true;
     pagination.innerHTML = '';
+    renderSummary(null);
     return;
   }
 
@@ -134,6 +179,10 @@ const renderList = (emails) => {
   list.hidden = false;
   paged.forEach((email) => {
     const li = document.createElement('li');
+    li.dataset.id = email.id;
+    if (email.id === state.summaryId) {
+      li.classList.add('is-active');
+    }
     const title = document.createElement('strong');
     title.textContent = email.subject || email.fileName;
 
@@ -142,18 +191,19 @@ const renderList = (emails) => {
     meta.innerHTML = `
       <span>${email.from || '-'}</span>
       <span>${email.date || '-'}</span>
-      <span>${email.attachments?.length ? email.attachments.join(', ') : '-'}</span>
+      <span>${formatSize(email.size)}</span>
     `;
 
     const badge = document.createElement('span');
     badge.className = 'file-badge';
     badge.textContent = categoryLabels[email.category] || 'Gemini';
 
-    const snippet = document.createElement('p');
-    snippet.className = 'snippet';
-    snippet.textContent = email.snippet || '-';
-
-    li.append(title, meta, badge, snippet);
+    li.append(title, meta, badge);
+    li.addEventListener('click', () => {
+      state.summaryId = email.id;
+      renderSummary(email.id);
+      renderList(state.emails);
+    });
     list.appendChild(li);
   });
 
@@ -283,7 +333,12 @@ const renderAll = (data) => {
     const label = lang === 'ko' ? '키워드' : 'Keywords';
     assistantBubble.textContent += `\n${label}: ${data.keywords.join(', ')}`;
   }
-  renderList(data.emails || []);
+  state.emails = data.emails || [];
+  if (!state.emails.find((email) => email.id === state.summaryId)) {
+    state.summaryId = state.emails.length ? state.emails[0].id : null;
+  }
+  renderList(state.emails);
+  renderSummary(state.summaryId);
 };
 
 const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
