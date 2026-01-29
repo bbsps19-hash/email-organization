@@ -95,11 +95,29 @@ const matchesTerms = (haystack, terms, minHits = 1) => {
   return hits.length >= minHits;
 };
 
+const loadSnapshotEmails = () => {
+  try {
+    const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
+    const filteredRaw = localStorage.getItem('emailOrganizerFiltered');
+    const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : null;
+    if (snapshot && Array.isArray(snapshot.emails) && snapshot.emails.length) {
+      return snapshot.emails;
+    }
+    const filtered = filteredRaw ? JSON.parse(filteredRaw) : null;
+    if (filtered && Array.isArray(filtered.emails) && filtered.emails.length) {
+      return filtered.emails;
+    }
+  } catch (error) {
+    // ignore storage errors
+  }
+  return [];
+};
+
 const filterEmailsByCriteria = (emails, prompt, keywords = []) => {
   const keywordTerms = keywords.map(normalizeText).filter(Boolean);
   const promptTerms = extractTerms(prompt);
   const terms = Array.from(new Set([...promptTerms, ...keywordTerms]));
-  const minHits = keywordTerms.length ? Math.min(2, keywordTerms.length) : 1;
+  const minHits = 1;
   const results = emails.filter((email) => {
     const haystack = normalizeText(
       [
@@ -239,7 +257,6 @@ const loadGeminiData = () => {
       sessionStorage.getItem('emailOrganizerGeminiPayload') ||
       localStorage.getItem('emailOrganizerGemini') ||
       sessionStorage.getItem('emailOrganizerGemini');
-    const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
     const params = new URLSearchParams(window.location.search);
     const paramRule = params.get('rule') || '';
     const normalizedRule = paramRule.trim();
@@ -264,7 +281,7 @@ const loadGeminiData = () => {
         status: 'pending',
       };
     }
-    const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : { emails: [] };
+    const snapshot = { emails: loadSnapshotEmails() };
     const matches = Array.isArray(gemini.matches) ? gemini.matches : [];
     const emails = Array.isArray(snapshot.emails) ? snapshot.emails : [];
     let selected = Array.isArray(gemini.results) && gemini.results.length
@@ -341,8 +358,7 @@ const renderAll = (data) => {
   renderSummary(state.summaryId);
 };
 
-const snapshotRaw = localStorage.getItem('emailOrganizerSnapshot');
-const snapshot = snapshotRaw ? JSON.parse(snapshotRaw) : { emails: [] };
+const snapshot = { emails: loadSnapshotEmails() };
 const baseData = loadGeminiData();
 console.log('[gemini] loaded', baseData);
 renderAll(baseData);
