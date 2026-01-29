@@ -5,6 +5,13 @@ const pagination = document.getElementById('emlPagination');
 const specTotal = document.getElementById('emlSpecTotal');
 const specQuery = document.getElementById('emlSpecQuery');
 const specCount = document.getElementById('emlSpecCount');
+const metaSubject = document.getElementById('emlMetaSubject');
+const metaFrom = document.getElementById('emlMetaFrom');
+const metaTo = document.getElementById('emlMetaTo');
+const metaDate = document.getElementById('emlMetaDate');
+const metaAttachments = document.getElementById('emlMetaAttachments');
+const metaCategory = document.getElementById('emlMetaCategory');
+const metaSnippet = document.getElementById('emlMetaSnippet');
 
 const lang = localStorage.getItem('emailOrganizerLang') || 'ko';
 const t = {
@@ -35,6 +42,27 @@ const state = {
 const categoryLabels = {
   uncategorized: lang === 'ko' ? '미분류' : 'Uncategorized',
   gemini: 'Gemini',
+};
+
+const renderSummary = (emailId) => {
+  const email = emails.find((item) => item.id === emailId);
+  if (!email) {
+    metaSubject.textContent = '-';
+    metaFrom.textContent = '-';
+    metaTo.textContent = '-';
+    metaDate.textContent = '-';
+    metaAttachments.textContent = '-';
+    metaCategory.textContent = '-';
+    metaSnippet.textContent = '-';
+    return;
+  }
+  metaSubject.textContent = email.subject || email.fileName || '-';
+  metaFrom.textContent = email.from || '-';
+  metaTo.textContent = email.to || '-';
+  metaDate.textContent = email.date || '-';
+  metaAttachments.textContent = email.attachments?.length ? email.attachments.join(', ') : '-';
+  metaCategory.textContent = categoryLabels[email.category] || '-';
+  metaSnippet.textContent = email.snippet || '-';
 };
 
 const renderList = (emails) => {
@@ -83,6 +111,7 @@ const renderList = (emails) => {
     li.addEventListener('click', () => {
       state.summaryId = email.id;
       renderList(emails);
+      renderSummary(email.id);
     });
     list.appendChild(li);
   });
@@ -160,3 +189,4 @@ if (filters) {
 
 if (emails.length) state.summaryId = emails[0]?.id ?? null;
 renderList(emails);
+renderSummary(state.summaryId);
