@@ -345,10 +345,14 @@ const callGemini = async (prompt, emails) => {
 const renderAll = (data) => {
   summary.textContent = t[lang].summary;
   userBubble.textContent = data.prompt || t[lang].fallbackUser;
-  assistantBubble.textContent = data.reply || t[lang].fallbackAssistant;
-  if (data.keywords && data.keywords.length) {
-    const label = lang === 'ko' ? '키워드' : 'Keywords';
-    assistantBubble.textContent += `\n${label}: ${data.keywords.join(', ')}`;
+  if (data.reply) {
+    assistantBubble.textContent = data.reply;
+  } else if (data.prompt) {
+    assistantBubble.textContent = lang === 'ko'
+      ? `${data.prompt} 관련 메일은 다음과 같습니다.`
+      : `Here are emails related to: ${data.prompt}.`;
+  } else {
+    assistantBubble.textContent = t[lang].fallbackAssistant;
   }
   state.emails = data.emails || [];
   if (!state.emails.find((email) => email.id === state.summaryId)) {
