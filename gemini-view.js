@@ -18,8 +18,8 @@ const t = {
     empty: '표시할 메일이 없습니다.',
     summary: '요청한 기준에 맞는 메일을 모두 표시합니다.',
     fallbackUser: '요청한 기준이 없습니다.',
-    fallbackAssistant: '요청하신 기준으로 메일을 분류해드리겠습니다.',
-    running: 'Gemini 분류 중...',
+    fallbackAssistant: '알겠어요! 기준에 맞는 메일을 골라볼게요.',
+    running: '잠시만요, 기준에 맞는 메일을 찾고 있어요.',
     error: 'Gemini 분류에 실패했습니다.',
     connectError: 'Gemini API에 연결할 수 없습니다. Cloudflare Pages 환경 변수(GEMINI_API_KEY)를 확인하세요.',
     setupError: 'Gemini API 키가 필요합니다. Cloudflare Pages 환경 변수(GEMINI_API_KEY)를 설정하세요.',
@@ -28,8 +28,8 @@ const t = {
     empty: 'No emails to display.',
     summary: 'Showing all emails that match your criteria.',
     fallbackUser: 'No criteria provided.',
-    fallbackAssistant: 'I will classify emails based on your criteria.',
-    running: 'Running Gemini...',
+    fallbackAssistant: 'Got it! I will find emails that match your criteria.',
+    running: 'Hang tight—finding emails that match your criteria.',
     error: 'Gemini classification failed.',
     connectError: 'Cannot reach the Gemini API. Check the Cloudflare Pages GEMINI_API_KEY setting.',
     setupError: 'Gemini API key is required. Set GEMINI_API_KEY in Cloudflare Pages.',
@@ -370,7 +370,14 @@ if (shouldRunGemini) {
     .then((data) => {
       const ids = Array.isArray(data.matches) ? data.matches : [];
       const keywords = Array.isArray(data.keywords) ? data.keywords : [];
-      const results = (snapshot.emails || []).filter((email) => ids.includes(email.id));
+      const baseEmails = snapshot.emails || [];
+      let results = baseEmails.filter((email) => ids.includes(email.id));
+      if (!results.length && baseEmails.length && (baseData.prompt || keywords.length)) {
+        results = filterEmailsByCriteria(baseEmails, baseData.prompt, keywords).results;
+      }
+      if (!results.length && Array.isArray(baseData.emails) && baseData.emails.length) {
+        results = baseData.emails;
+      }
       const payload = {
         prompt: baseData.prompt,
         matches: ids,
