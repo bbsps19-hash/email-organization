@@ -289,6 +289,12 @@ body {
   color: var(--muted);
 }
 
+.summary-filter {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .filter-controls {
   display: grid;
   gap: 14px;
@@ -681,6 +687,31 @@ body {
   font-weight: 700;
   font-size: 0.7rem;
   border: 1.5px solid rgba(11, 11, 11, 0.5);
+}
+
+.file-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(11, 11, 11, 0.5);
+  background: #fff;
+  width: fit-content;
+}
+
+.file-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: transparent;
+}
+
+.file-status.is-active::before {
+  background: var(--accent);
 }
 
 #fileList li.is-hidden {

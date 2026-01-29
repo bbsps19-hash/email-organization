@@ -28,6 +28,7 @@ const metaCategory = document.getElementById('metaCategory');
 const metaSnippet = document.getElementById('metaSnippet');
 const attachmentList = document.getElementById('attachmentList');
 const attachmentEmpty = document.getElementById('attachmentEmpty');
+const filterSummary = document.getElementById('filterSummary');
 
 const state = {
   lang: 'ko',
@@ -966,6 +967,56 @@ const setMode = (mode) => {
   renderFilterPanel();
 };
 
+const parseSearchQuery = (input) => {
+  const raw = String(input || '').trim();
+  const result = { keywords: [], scoped: [], raw };
+  if (!raw) return result;
+  const tokens = raw.split(',').map((term) => term.trim()).filter(Boolean);
+  const labelMap = [
+    { field: 'subject', labels: ['제목', 'subject', 'sub'] },
+    { field: 'body', labels: ['본문', 'body', 'content'] },
+    { field: 'from', labels: ['보낸사람', '발신자', 'from', 'sender'] },
+    { field: 'attachments', labels: ['첨부파일명', '첨부', 'attachments', 'attachment'] },
+  ];
+
+  tokens.forEach((token) => {
+    const normalized = token.toLowerCase();
+    let matched = false;
+    labelMap.forEach((label) => {
+      label.labels.forEach((key) => {
+        const prefix = `${key}:`;
+        if (normalized.startsWith(prefix)) {
+          const term = token.slice(prefix.length).trim().toLowerCase();
+          if (term) result.scoped.push({ field: label.field, term });
+          matched = true;
+        }
+      });
+    });
+    if (!matched) {
+      result.keywords.push(token.toLowerCase());
+    }
+  });
+  return result;
+};
+
+const buildSearchSummary = () => {
+  const parsed = parseSearchQuery(state.searchQuery);
+  if (!parsed.raw && !parsed.keywords.length && !parsed.scoped.length) return '-';
+  const parts = [];
+  parsed.scoped.forEach((item) => {
+    const label = item.field === 'subject'
+      ? '제목'
+      : item.field === 'body'
+        ? '본문'
+        : item.field === 'from'
+          ? '보낸사람'
+          : '첨부파일명';
+    parts.push(`${label}: ${item.term}`);
+  });
+  if (parsed.keywords.length) parts.push(`키워드: ${parsed.keywords.join(', ')}`);
+  return `검색 기준: ${parts.join(' · ')}`;
+};
+
 const persistSnapshots = () => {
   try {
     const serialize = (email) => ({
@@ -1053,7 +1104,12 @@ const renderList = () => {
     category.className = 'file-badge';
     category.textContent = categoryLabels[email.category]?.[state.lang] ?? '-';
 
-    li.append(title, meta, category);
+    const status = document.createElement('span');
+    status.className = 'file-status';
+    status.textContent = email.id === state.summaryId ? (state.lang === 'ko' ? '선택됨' : 'Selected') : (state.lang === 'ko' ? '미선택' : 'Not selected');
+    if (email.id === state.summaryId) status.classList.add('is-active');
+
+    li.append(title, meta, category, status);
     li.addEventListener('click', () => {
       state.summaryId = email.id;
       renderSummary(email.id);
@@ -1469,6 +1525,11 @@ const renderSummary = (id) => {
     attachmentEmpty.textContent = '-';
     attachmentList.hidden = true;
     attachmentList.innerHTML = '';
+    if (filterSummary) {
+      filterSummary.textContent = state.mode === 'gemini'
+        ? (state.lang === 'ko' ? '분류 기준: Gemini' : 'Classification: Gemini')
+        : buildSearchSummary();
+    }
     return;
   }
 
@@ -1494,6 +1555,11 @@ const renderSummary = (id) => {
   metaCategory.textContent = label;
   metaSnippet.textContent = email.snippet || '-';
   renderAttachmentList(email);
+  if (filterSummary) {
+    filterSummary.textContent = state.mode === 'gemini'
+      ? (state.lang === 'ko' ? '분류 기준: Gemini' : 'Classification: Gemini')
+      : buildSearchSummary();
+  }
 };
 
 const renderAttachmentList = (email) => {
@@ -1617,11 +1683,8 @@ const getActiveFields = () => {
 };
 
 const getFilteredEmails = () => {
-  const query = state.searchQuery.trim().toLowerCase();
-  const keywords = query
-    .split(',')
-    .map((term) => term.trim())
-    .filter(Boolean);
+  const query = state.searchQuery.trim();
+  const parsed = parseSearchQuery(query);
   const fields = getActiveFields();
 
   return state.emails.filter((email) => {
@@ -1629,7 +1692,7 @@ const getFilteredEmails = () => {
       if (!state.geminiMatches) return true;
       return state.geminiMatches.has(email.id);
     }
-    if (!query && !keywords.length) return true;
+    if (!query && !parsed.keywords.length && !parsed.scoped.length) return true;
     if (!fields.length) return false;
 
     const haystacks = [];
@@ -1639,8 +1702,16 @@ const getFilteredEmails = () => {
     if (fields.includes('attachments')) haystacks.push(email.attachments.join(' '));
 
     const combined = haystacks.join(' ').toLowerCase();
-    if (!keywords.length) return combined.includes(query);
-    return keywords.every((term) => combined.includes(term));
+    const keywordMatch = parsed.keywords.every((term) => combined.includes(term));
+    if (!keywordMatch) return false;
+    if (!parsed.scoped.length) return true;
+    return parsed.scoped.every((item) => {
+      if (item.field === 'subject') return (email.subject || '').toLowerCase().includes(item.term);
+      if (item.field === 'body') return (email.body || '').toLowerCase().includes(item.term);
+      if (item.field === 'from') return (email.from || '').toLowerCase().includes(item.term);
+      if (item.field === 'attachments') return email.attachments.join(' ').toLowerCase().includes(item.term);
+      return true;
+    });
   });
 };
 
